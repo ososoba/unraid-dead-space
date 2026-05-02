@@ -8,13 +8,28 @@ so extra fields don't fail validation.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 
 class _Loose(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+
+def _empty_to_none(v: Any) -> Any:
+    """Tautulli returns '' for missing optional ints (file_size, year, etc).
+
+    Pydantic v2 won't coerce that — apply via BeforeValidator on every
+    optional-int field that might come back empty.
+    """
+    if v == "" or v == "null":
+        return None
+    return v
+
+
+OptInt = Annotated[int | None, BeforeValidator(_empty_to_none)]
+OptStr = Annotated[str | None, BeforeValidator(_empty_to_none)]
 
 
 # ---------- Arr ----------
@@ -92,38 +107,38 @@ class ArrSeries(_Loose):
 
 class TautulliHistoryRow(_Loose):
     id: int = Field(alias="id")  # row_id; stable PK
-    rating_key: int | None = None
-    parent_rating_key: int | None = None
-    grandparent_rating_key: int | None = None
-    media_type: str | None = None  # movie | episode
-    user_id: int | None = None
-    user: str | None = None
-    title: str | None = None
-    parent_title: str | None = None
-    grandparent_title: str | None = None
-    date: int | None = None  # unix
-    started: int | None = None
-    stopped: int | None = None
-    percent_complete: int | None = None
+    rating_key: OptInt = None
+    parent_rating_key: OptInt = None
+    grandparent_rating_key: OptInt = None
+    media_type: OptStr = None  # movie | episode
+    user_id: OptInt = None
+    user: OptStr = None
+    title: OptStr = None
+    parent_title: OptStr = None
+    grandparent_title: OptStr = None
+    date: OptInt = None  # unix
+    started: OptInt = None
+    stopped: OptInt = None
+    percent_complete: OptInt = None
     watched_status: float | None = None  # 0 | 0.5 | 1
 
 
 class TautulliLibraryItem(_Loose):
-    rating_key: int
-    section_id: int | None = None
-    section_name: str | None = None
-    title: str | None = None
-    year: int | None = None
-    media_type: str | None = None  # movie | show | season | episode
-    guid: str | None = None
+    rating_key: OptInt = None
+    section_id: OptInt = None
+    section_name: OptStr = None
+    title: OptStr = None
+    year: OptInt = None
+    media_type: OptStr = None  # movie | show | season | episode
+    guid: OptStr = None
     guids: list[str] = Field(default_factory=list)
-    file_size: int | None = None
+    file_size: OptInt = None
 
 
 class TautulliUser(_Loose):
     user_id: int
-    username: str | None = None
-    friendly_name: str | None = None
+    username: OptStr = None
+    friendly_name: OptStr = None
 
 
 # ---------- Overseerr / Seerr ----------

@@ -8,7 +8,36 @@ from dms.identity import (
     parse_guid,
     parse_guids,
 )
-from dms.models import RequesterUser, TautulliUser
+from dms.models import (
+    RequesterUser,
+    TautulliHistoryRow,
+    TautulliLibraryItem,
+    TautulliUser,
+)
+
+
+class TestTautulliEmptyStringCoercion:
+    """Real-world Tautulli payloads return '' for missing optional ints."""
+
+    def test_library_item_empty_file_size(self) -> None:
+        item = TautulliLibraryItem.model_validate(
+            {"rating_key": 12, "file_size": ""}
+        )
+        assert item.file_size is None
+        assert item.rating_key == 12
+
+    def test_library_item_empty_year(self) -> None:
+        item = TautulliLibraryItem.model_validate({"rating_key": 12, "year": ""})
+        assert item.year is None
+
+    def test_history_row_empty_optional_ints(self) -> None:
+        row = TautulliHistoryRow.model_validate(
+            {"id": 1, "rating_key": "", "user_id": "", "stopped": ""}
+        )
+        assert row.id == 1
+        assert row.rating_key is None
+        assert row.user_id is None
+        assert row.stopped is None
 
 
 class TestParseGuid:

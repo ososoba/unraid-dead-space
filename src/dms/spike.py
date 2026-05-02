@@ -115,6 +115,40 @@ async def _pull_arr(
     return report, items, tags_by_id
 
 
+async def _enrich_with_guids(
+    client: TautulliClient,
+    items: list[TautulliLibraryItem],
+    *,
+    concurrency: int,
+) -> list[TautulliLibraryItem]:
+    """Fan out get_metadata per rating_key — library_media_info has no guids.
+
+    This is the join key for Arr ↔ Plex matching. Capped at `concurrency`
+    parallel requests so we don't hammer Tautulli.
+    """
+    sem = asyncio.Semaphore(max(1, concurrency))
+
+    async def fetch_one(item: TautulliLibraryItem) -> TautulliLibraryItem:
+        if not item.rating_key:
+            return item
+        async with sem:
+            try:
+                meta = await client.metadata(item.rating_key)
+            except UpstreamError as exc:
+                log.warning("metadata fetch failed for rating_key=%s: %s", item.rating_key, exc)
+                return item
+        guid = meta.get("guid") if isinstance(meta, dict) else None
+        guids = meta.get("guids") if isinstance(meta, dict) else None
+        return item.model_copy(
+            update={
+                "guid": guid or item.guid,
+                "guids": list(guids) if isinstance(guids, list) else item.guids,
+            }
+        )
+
+    return list(await asyncio.gather(*(fetch_one(i) for i in items)))
+
+
 async def _pull_tautulli(
     config: AppConfig,
 ) -> tuple[bool, list[TautulliHistoryRow], list[TautulliLibraryItem], list[TautulliUser]]:
@@ -126,10 +160,20 @@ async def _pull_tautulli(
             libraries = await t.list_libraries()
             library_items: list[TautulliLibraryItem] = []
             for lib in libraries:
-                section_id = lib.get("section_id")
-                if section_id is None:
+                section_id_raw = lib.get("section_id")
+                count = lib.get("count")
+                if not section_id_raw or count in (0, "0"):  # skip empty libs
                     continue
-                library_items.extend(await t.library_media_info(int(section_id)))
+                try:
+                    section_id = int(section_id_raw)
+                except (TypeError, ValueError):
+                    log.warning("skipping library with non-int section_id: %r", section_id_raw)
+                    continue
+                library_items.extend(await t.library_media_info(section_id))
+            log.info("enriching %d Plex items with guids via get_metadata", len(library_items))
+            library_items = await _enrich_with_guids(
+                t, library_items, concurrency=config.http.max_concurrency
+            )
             history = await t.history(length=config.http.backfill_page_size)
         return True, history, library_items, users
     except UpstreamError as exc:
