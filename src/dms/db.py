@@ -39,6 +39,10 @@ def connect(
         path,
         timeout=timeout,
         detect_types=sqlite3.PARSE_DECLTYPES,
+        # FastAPI may dispatch sync handlers on threadpools; we open one
+        # connection per request and never share it. Disable the same-thread
+        # guard so async-then-threadpool handoff is safe.
+        check_same_thread=False,
     )
     conn.row_factory = sqlite3.Row
     if wal and str(path) != ":memory:":

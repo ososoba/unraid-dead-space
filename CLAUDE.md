@@ -18,6 +18,8 @@ Private Unraid container that identifies unwatched/stale media across Sonarr/Rad
 - Apply DB migrations: `python -m dms.cli.migrate` (default `./config/db.sqlite`)
   - `--list` shows all known migrations, `--status` shows applied vs pending
 - Run a full sync: `python -m dms.cli.sync --pretty` (auto-applies migrations)
+- Generate a password hash: `python -m dms.cli.hash_password` (paste into APP_PASSWORD_HASH)
+- Run the web app: `python -m dms.cli.serve` (default `0.0.0.0:8765`, `--reload` for dev)
 
 ## Architecture
 - `src/dms/clients/` — async API clients (Sonarr/Radarr, Tautulli, Overseerr/Seerr).
@@ -28,12 +30,20 @@ Private Unraid container that identifies unwatched/stale media across Sonarr/Rad
 - `src/dms/migrations/` — versioned SQL migrations + runner; `0001_initial.sql` is the full 19-table schema.
 - `src/dms/cli/migrate.py` — `python -m dms.cli.migrate` runs pending migrations.
 - `src/dms/cli/sync.py` — `python -m dms.cli.sync` runs a full sync.
+- `src/dms/cli/serve.py` — `python -m dms.cli.serve` runs the FastAPI web app.
+- `src/dms/cli/hash_password.py` — bcrypt hash generator for APP_PASSWORD_HASH.
 - `src/dms/sync/` — sync pipeline modules:
   - `locks.py` (heartbeat + stale recovery), `runs.py` (job + step bookkeeping),
     `upsert.py` (UPSERT + tombstones), `arr_sync.py`, `plex_sync.py`,
     `tautulli_sync.py`, `requester_sync.py`, `attribution.py`, `watch_state.py`,
     `candidates_db.py`, `runner.py` (orchestrator).
-- (Future) `src/dms/routes/`, etc.
+- `src/dms/app.py` — FastAPI app factory (lifespan auto-runs migrations).
+- `src/dms/auth.py` — session cookie + CSRF + login_required dep.
+- `src/dms/deps.py` — per-request DB dependency.
+- `src/dms/settings_store.py` — config-table-backed settings + env precedence.
+- `src/dms/routes/` — HTTP routes: `login`, `healthz`, `config_route`.
+- `src/dms/templates/`, `src/dms/static/` — Jinja2 + plain CSS (Tailwind in Step 7).
+- (Future) homepage + instance deepdive routes (Step 5).
 
 ## Authoritative docs
 - `PLAN.md` — full implementation plan, schema, decisions log. Update when decisions change.
@@ -51,8 +61,9 @@ Private Unraid container that identifies unwatched/stale media across Sonarr/Rad
 ## Build order (current step in bold)
 1. CLI spike (read-only, no DB). ✓
 2. Schema + migrations. ✓
-3. **Sync pipeline.** ✓
-4. FastAPI shell + auth.
+3. Sync pipeline. ✓
+4. **FastAPI shell + auth.** ✓
+5. UI dashboards.
 4. FastAPI shell + auth.
 5. UI.
 6. Sync UX.

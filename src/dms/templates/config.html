@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Config — Dead Movies &amp; Shows{% endblock %}
+{% block content %}
+<section>
+  <h1>Configuration</h1>
+  {% if request.query_params.get('saved') %}
+    <p class="ok">Settings saved.</p>
+  {% endif %}
+
+  <h2>Last sync</h2>
+  {% if last_sync %}
+    <p>
+      Run #{{ last_sync.id }} ({{ last_sync.kind }}) — <strong>{{ last_sync.status }}</strong><br/>
+      Started {{ last_sync.started_at }}{% if last_sync.finished_at %},
+      finished {{ last_sync.finished_at }}{% endif %}.
+    </p>
+  {% else %}
+    <p>No syncs yet.</p>
+  {% endif %}
+  <button class="action" data-action="sync-now">Sync now</button>
+  <span id="sync-now-status" class="status"></span>
+
+  <h2>Connections</h2>
+  <table class="instances">
+    <thead><tr><th>Slug</th><th>Kind</th><th>Name</th><th>URL</th><th>Items</th><th>Last seen OK</th><th>Last error</th><th></th></tr></thead>
+    <tbody>
+      {% for i in instance_status %}
+        <tr>
+          <td>{{ i.slug }}</td>
+          <td>{{ i.kind }}</td>
+          <td>{{ i.name }}</td>
+          <td>{{ i.url }}</td>
+          <td>{{ i.item_count }}</td>
+          <td>{{ i.last_seen_ok_at or '—' }}</td>
+          <td>{{ i.last_error or '' }}</td>
+          <td><button class="action" data-action="test" data-slug="{{ i.slug }}">Test</button></td>
+        </tr>
+      {% endfor %}
+      {% if tautulli %}
+        <tr>
+          <td>tautulli</td><td>tautulli</td><td>Tautulli</td>
+          <td>{{ tautulli.url }}</td><td>—</td><td>—</td><td></td>
+          <td><button class="action" data-action="test" data-slug="tautulli">Test</button></td>
+        </tr>
+      {% endif %}
+      {% for r in requester_instances %}
+        <tr>
+          <td>{{ r.slug }}</td><td>{{ r.source }}</td><td>{{ r.name }}</td>
+          <td>{{ r.url }}</td><td>—</td><td>—</td><td></td>
+          <td><button class="action" data-action="test" data-slug="{{ r.slug }}">Test</button></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="hint">API keys are loaded from <code>.env</code> and never displayed here.</p>
+
+  <h2>Thresholds</h2>
+  <form method="post" action="/config/save">
+    <input type="hidden" name="_csrf" value="{{ csrf_token(request) }}" />
+    <label>Watch scope
+      <select name="WATCH_SCOPE">
+        <option value="anyone" {% if tunables.WATCH_SCOPE == 'anyone' or not tunables.WATCH_SCOPE %}selected{% endif %}>Anyone</option>
+        <option value="requester" {% if tunables.WATCH_SCOPE == 'requester' %}selected{% endif %}>Requester</option>
+      </select>
+    </label>
+    <label>Movies threshold % <input type="number" name="WATCH_THRESHOLD_MOVIES_PCT"
+        min="1" max="100" value="{{ tunables.WATCH_THRESHOLD_MOVIES_PCT or 80 }}" /></label>
+    <label>Episodes threshold % <input type="number" name="WATCH_THRESHOLD_EPISODES_PCT"
+        min="1" max="100" value="{{ tunables.WATCH_THRESHOLD_EPISODES_PCT or 80 }}" /></label>
+    <label>Specials
+      <select name="SERIES_SPECIALS_MODE">
+        <option value="ignore" {% if tunables.SERIES_SPECIALS_MODE == 'ignore' or not tunables.SERIES_SPECIALS_MODE %}selected{% endif %}>Ignore (default)</option>
+        <option value="include" {% if tunables.SERIES_SPECIALS_MODE == 'include' %}selected{% endif %}>Include</option>
+      </select>
+    </label>
+    <label>Never-watched threshold (days) <input type="number" name="NEVER_WATCHED_DAYS"
+        min="0" value="{{ tunables.NEVER_WATCHED_DAYS or 90 }}" /></label>
+    <label>Stale threshold (days) <input type="number" name="STALE_DAYS"
+        min="0" value="{{ tunables.STALE_DAYS or 180 }}" /></label>
+    <button type="submit">Save</button>
+  </form>
+
+  <h2>Requester ↔ Plex user mapping</h2>
+  {% if user_mappings %}
+    <table>
+      <thead><tr><th>Source</th><th>Requester</th><th>Tautulli user</th><th>Method</th><th>Confidence</th></tr></thead>
+      <tbody>
+        {% for m in user_mappings %}
+          <tr>
+            <td>{{ m.requester_source }}</td>
+            <td>{{ m.requester_name or '—' }}</td>
+            <td>{{ m.tautulli_user_name or '<unmapped>' }}</td>
+            <td>{{ m.match_method }}</td>
+            <td>{{ m.confidence }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>None yet — run a sync first.</p>
+  {% endif %}
+
+  <h2>History tools</h2>
+  <button class="action danger" data-action="purge-history">Purge all watch history</button>
+  <span id="purge-status" class="status"></span>
+</section>
+
+<script>
+const csrf = "{{ csrf_token(request) }}";
+async function post(url, body) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'X-CSRF-Token': csrf, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return res.json().catch(() => ({}));
+}
+document.querySelectorAll('button.action').forEach(btn => {
+  btn.addEventListener('click', async (e) => {
+    const a = btn.dataset.action;
+    if (a === 'test') {
+      btn.disabled = true; btn.textContent = 'Testing…';
+      const data = await post('/config/test/' + btn.dataset.slug);
+      btn.disabled = false;
+      btn.textContent = data.ok ? 'OK' : 'FAIL';
+      btn.title = data.detail || '';
+    } else if (a === 'sync-now') {
+      const status = document.getElementById('sync-now-status');
+      btn.disabled = true; status.textContent = 'syncing…';
+      const data = await post('/config/sync-now');
+      btn.disabled = false;
+      status.textContent = `run #${data.run_id} → ${data.status} (${data.candidate_rows} candidates)`;
+    } else if (a === 'purge-history') {
+      if (!confirm('Delete all locally-mirrored watch history? Tautulli is unaffected.')) return;
+      const status = document.getElementById('purge-status');
+      btn.disabled = true; status.textContent = 'purging…';
+      const data = await post('/config/purge-history');
+      btn.disabled = false;
+      status.textContent = data.ok ? `deleted ${data.deleted_rows} rows` : 'failed';
+    }
+  });
+});
+</script>
+{% endblock %}
