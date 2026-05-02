@@ -46,6 +46,28 @@ def _max_row_id(conn: sqlite3.Connection) -> int | None:
     return row[0] if row and row[0] is not None else None
 
 
+def _incremental_after(conn: sqlite3.Connection) -> int | None:
+    """Cursor floor for incremental sync.
+
+    PLAN.md asks for a 24-hour overlap window so out-of-order Tautulli
+    inserts (or row_id reassignments after a Tautulli DB restore) don't
+    silently get dropped. We achieve this by lowering the cursor below the
+    smallest row_id we already have in the last 24 hours; INSERT OR IGNORE
+    on `source_row_id` handles the duplicates we'll re-fetch.
+    """
+    overlap = conn.execute(
+        """
+        SELECT MIN(source_row_id) FROM watch_events
+        WHERE started_at IS NOT NULL
+          AND started_at >= datetime('now', '-1 day')
+        """
+    ).fetchone()
+    if overlap and overlap[0] is not None:
+        return int(overlap[0]) - 1
+    # No rows in the last 24h — fall back to the last seen row_id.
+    return _max_row_id(conn)
+
+
 def _retention_cutoff_unix(years: int) -> int:
     """Earliest `started_at` we'll bother fetching, in unix seconds."""
     cutoff = datetime.now(UTC) - timedelta(days=365 * years)
@@ -62,11 +84,14 @@ async def sync_tautulli_history(
     timeout: float = 30.0,
     retention_years: int = 10,
 ) -> TautulliHistoryResult:
-    after = _max_row_id(conn)
+    # First-ever sync: no rows yet, use full retention cap.
+    # Incremental sync: lower the cursor by 24h to catch out-of-order rows.
+    bootstrap_max = _max_row_id(conn)
+    after = _incremental_after(conn) if bootstrap_max is not None else None
     cutoff = _retention_cutoff_unix(retention_years)
     rows_inserted = 0
     pages_processed = 0
-    last_row_id: int | None = after
+    last_row_id: int | None = bootstrap_max
     users: list[TautulliUser] = []
 
     async with TautulliClient(config, timeout=timeout) as t:

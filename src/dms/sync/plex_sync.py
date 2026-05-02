@@ -94,20 +94,19 @@ async def sync_plex_inventory(
                     run_id=run_id,
                     section_name=lib.get("section_name"),
                 )
-                # Each plex_item may have multiple files (multi-part movies);
-                # we upsert one row per (plex_item_id, rating_key + index slot).
-                # For v1 the get_library_media_info row only ever yields a single
-                # rating_key per plex_item, so we collapse parts under the same
-                # rating_key — practical for movies/shows where Plex sets a
-                # single primary file per item.
+                # Each plex_item can have multiple parts (split files, multi-
+                # disc rips). The 0002 migration added `part_index` to the
+                # unique key so each part gets its own row; pass the
+                # enumeration index here.
                 files = file_meta.get(item.rating_key, [])
                 if files:
-                    for fmeta in files:
+                    for idx, fmeta in enumerate(files):
                         _upsert_plex_media_file(
                             conn,
                             plex_item_id,
                             item.rating_key,
                             fmeta,
+                            part_index=idx,
                             run_id=run_id,
                         )
                         files_seen += 1
@@ -124,6 +123,7 @@ async def sync_plex_inventory(
                             video_resolution=None,
                             video_codec=None,
                         ),
+                        part_index=0,
                         run_id=run_id,
                     )
                     files_seen += 1
@@ -257,6 +257,7 @@ def _upsert_plex_media_file(
     rating_key: int,
     fmeta: PlexFileMeta,
     *,
+    part_index: int,
     run_id: int,
 ) -> None:
     upsert(
@@ -265,6 +266,7 @@ def _upsert_plex_media_file(
         {
             "plex_item_id": plex_item_id,
             "rating_key": rating_key,
+            "part_index": part_index,
             "file_path": fmeta.file_path,
             "size_bytes": fmeta.size_bytes,
             "container": fmeta.container,
@@ -273,5 +275,5 @@ def _upsert_plex_media_file(
             "last_seen_sync_run_id": run_id,
             "deleted_at": None,
         },
-        conflict_keys=("plex_item_id", "rating_key"),
+        conflict_keys=("plex_item_id", "rating_key", "part_index"),
     )

@@ -37,10 +37,13 @@ _throttle_lock = Lock()
 
 
 def _client_id(request: Request) -> str:
-    """Cheap client identifier for throttling. Honors trusted X-Forwarded-For."""
-    fwd = request.headers.get("x-forwarded-for", "")
-    if fwd:
-        return fwd.split(",", 1)[0].strip()
+    """Cheap client identifier for throttling.
+
+    Uses `request.client.host` only. Uvicorn's ProxyHeadersMiddleware
+    replaces this from `X-Forwarded-For` *if and only if* the connecting
+    socket peer is in `forwarded_allow_ips`. Reading the raw header here
+    would let any direct LAN client spoof the value to dodge the lockout.
+    """
     client = request.client
     return client.host if client else "unknown"
 

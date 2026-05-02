@@ -208,7 +208,14 @@ def compute_candidates(
             params,
         )
 
-        # 7b. orphan_arr_no_plex (series) — keep external-ID match for v1.
+        # 7b. orphan_arr_no_plex (series) — file-level matching by aggregate.
+        # We sum arr_files per series (v_arr_item_size already does this) and
+        # plex_media_files per matching show, then compare with a 5% tolerance.
+        # This catches the split-quality Sonarr case (1080p vs 4K Sonarr,
+        # Plex has only one): the size sums won't match, so the unmatched
+        # quality flags as orphan.
+        # Per-episode-file matching is still v2 (would need episode-level
+        # plex_items + plex_media_files, which the current sync doesn't fetch).
         conn.execute(
             """
             INSERT INTO candidates
@@ -225,11 +232,25 @@ def compute_candidates(
               AND ai.ignored_local = 0
               AND ir.id IS NULL
               AND NOT EXISTS (
-                SELECT 1 FROM plex_items pi
+                SELECT 1
+                FROM plex_items pi
+                LEFT JOIN (
+                  SELECT plex_item_id, SUM(size_bytes) AS total
+                  FROM plex_media_files
+                  WHERE deleted_at IS NULL
+                  GROUP BY plex_item_id
+                ) pmf_total ON pmf_total.plex_item_id = pi.id
                 WHERE pi.deleted_at IS NULL
                   AND ((ai.tvdb_id IS NOT NULL AND pi.tvdb_id = ai.tvdb_id)
                     OR (ai.tmdb_id IS NOT NULL AND pi.tmdb_id = ai.tmdb_id)
                     OR (ai.imdb_id IS NOT NULL AND pi.imdb_id = ai.imdb_id))
+                  AND (
+                    -- No size data on either side → fall back to ID match.
+                    s.size_bytes = 0
+                    OR pmf_total.total IS NULL
+                    OR pmf_total.total = 0
+                    OR ABS(pmf_total.total - s.size_bytes) < s.size_bytes * 0.05
+                  )
               )
             """,
             params,
