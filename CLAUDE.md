@@ -17,6 +17,7 @@ Private Unraid container that identifies unwatched/stale media across Sonarr/Rad
 - Run CLI spike: `python -m dms.spike` (reads `.env`, prints JSON to stdout)
 - Apply DB migrations: `python -m dms.cli.migrate` (default `./config/db.sqlite`)
   - `--list` shows all known migrations, `--status` shows applied vs pending
+- Run a full sync: `python -m dms.cli.sync --pretty` (auto-applies migrations)
 
 ## Architecture
 - `src/dms/clients/` — async API clients (Sonarr/Radarr, Tautulli, Overseerr/Seerr).
@@ -26,7 +27,13 @@ Private Unraid container that identifies unwatched/stale media across Sonarr/Rad
 - `src/dms/db.py` — SQLite connection helper (WAL, FK, dict-row factory).
 - `src/dms/migrations/` — versioned SQL migrations + runner; `0001_initial.sql` is the full 19-table schema.
 - `src/dms/cli/migrate.py` — `python -m dms.cli.migrate` runs pending migrations.
-- (Future) `src/dms/sync/`, `src/dms/routes/`, etc.
+- `src/dms/cli/sync.py` — `python -m dms.cli.sync` runs a full sync.
+- `src/dms/sync/` — sync pipeline modules:
+  - `locks.py` (heartbeat + stale recovery), `runs.py` (job + step bookkeeping),
+    `upsert.py` (UPSERT + tombstones), `arr_sync.py`, `plex_sync.py`,
+    `tautulli_sync.py`, `requester_sync.py`, `attribution.py`, `watch_state.py`,
+    `candidates_db.py`, `runner.py` (orchestrator).
+- (Future) `src/dms/routes/`, etc.
 
 ## Authoritative docs
 - `PLAN.md` — full implementation plan, schema, decisions log. Update when decisions change.
@@ -43,8 +50,9 @@ Private Unraid container that identifies unwatched/stale media across Sonarr/Rad
 
 ## Build order (current step in bold)
 1. CLI spike (read-only, no DB). ✓
-2. **Schema + migrations.** ✓
-3. Sync pipeline.
+2. Schema + migrations. ✓
+3. **Sync pipeline.** ✓
+4. FastAPI shell + auth.
 4. FastAPI shell + auth.
 5. UI.
 6. Sync UX.

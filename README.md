@@ -2,7 +2,7 @@
 
 Private Unraid container that finds unwatched and stale media in your Sonarr/Radarr libraries by joining Tautulli watch history with Overseerr/Seerr request data. Reports reclaim candidates; does not delete.
 
-> Status: **Step 2 done — schema + migrations.** Step 1 (read-only CLI spike) and Step 2 (SQLite schema, 19 tables, idempotent migration runner) are in. Sync pipeline next.
+> Status: **Step 3 done — sync pipeline.** Steps 1 (CLI spike), 2 (SQLite schema), and 3 (sync runner with lock/heartbeat, tombstones, resumable Tautulli backfill, partial-failure handling, candidate engine) are in. FastAPI shell + UI next.
 
 ## Quick start (spike)
 
@@ -20,6 +20,9 @@ python -m dms.spike
 # 4. Initialize DB (creates ./config/db.sqlite by default)
 python -m dms.cli.migrate
 python -m dms.cli.migrate --status   # show applied vs pending
+
+# 5. Run a full sync (also auto-applies any pending migrations)
+python -m dms.cli.sync --pretty
 ```
 
 The spike prints JSON to stdout: per-instance counts, identity-map stats, top candidates by reason. Use `--limit N` to cap rows, `--reason <name>` to filter.

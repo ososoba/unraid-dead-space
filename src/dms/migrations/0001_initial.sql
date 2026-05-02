@@ -143,7 +143,8 @@ CREATE TABLE IF NOT EXISTS plex_media_files (
     video_resolution      TEXT,
     video_codec           TEXT,
     last_seen_sync_run_id INTEGER,
-    deleted_at            TEXT
+    deleted_at            TEXT,
+    UNIQUE (plex_item_id, rating_key)
 );
 CREATE INDEX IF NOT EXISTS idx_plex_media_files_item ON plex_media_files(plex_item_id);
 CREATE INDEX IF NOT EXISTS idx_plex_media_files_path ON plex_media_files(file_path);
