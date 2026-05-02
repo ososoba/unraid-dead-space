@@ -20,9 +20,7 @@ class TestTautulliEmptyStringCoercion:
     """Real-world Tautulli payloads return '' for missing optional ints."""
 
     def test_library_item_empty_file_size(self) -> None:
-        item = TautulliLibraryItem.model_validate(
-            {"rating_key": 12, "file_size": ""}
-        )
+        item = TautulliLibraryItem.model_validate({"rating_key": 12, "file_size": ""})
         assert item.file_size is None
         assert item.rating_key == 12
 

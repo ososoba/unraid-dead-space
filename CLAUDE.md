@@ -15,13 +15,18 @@ Private Unraid container that identifies unwatched/stale media across Sonarr/Rad
 - Format: `ruff format src tests`
 - Test: `pytest`
 - Run CLI spike: `python -m dms.spike` (reads `.env`, prints JSON to stdout)
+- Apply DB migrations: `python -m dms.cli.migrate` (default `./config/db.sqlite`)
+  - `--list` shows all known migrations, `--status` shows applied vs pending
 
 ## Architecture
 - `src/dms/clients/` — async API clients (Sonarr/Radarr, Tautulli, Overseerr/Seerr).
 - `src/dms/identity.py` — GUID parsing + external-ID resolution (rating_key → tmdb/tvdb/imdb).
 - `src/dms/candidates.py` — bucket / candidate engine.
 - `src/dms/spike.py` — read-only CLI that joins all sources and emits JSON.
-- (Future) `src/dms/sync/`, `src/dms/routes/`, `src/dms/db.py`, etc.
+- `src/dms/db.py` — SQLite connection helper (WAL, FK, dict-row factory).
+- `src/dms/migrations/` — versioned SQL migrations + runner; `0001_initial.sql` is the full 19-table schema.
+- `src/dms/cli/migrate.py` — `python -m dms.cli.migrate` runs pending migrations.
+- (Future) `src/dms/sync/`, `src/dms/routes/`, etc.
 
 ## Authoritative docs
 - `PLAN.md` — full implementation plan, schema, decisions log. Update when decisions change.
@@ -37,8 +42,8 @@ Private Unraid container that identifies unwatched/stale media across Sonarr/Rad
 - Secrets only in `.env` (gitignored). Never log API keys.
 
 ## Build order (current step in bold)
-1. **CLI spike** (read-only, no DB).
-2. Schema + migrations.
+1. CLI spike (read-only, no DB). ✓
+2. **Schema + migrations.** ✓
 3. Sync pipeline.
 4. FastAPI shell + auth.
 5. UI.
