@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Dead Movies & Shows: a film reel with a sweep / age dial. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#284b8e"/>
+      <stop offset="100%" stop-color="#152b54"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="22" fill="url(#bg)"/>
+  <!-- film reel -->
+  <circle cx="64" cy="64" r="38" fill="none" stroke="#f5f6fa" stroke-width="6"/>
+  <circle cx="64" cy="64" r="6" fill="#f5f6fa"/>
+  <g fill="#f5f6fa">
+    <circle cx="64" cy="34" r="6"/>
+    <circle cx="64" cy="94" r="6"/>
+    <circle cx="34" cy="64" r="6"/>
+    <circle cx="94" cy="64" r="6"/>
+  </g>
+  <!-- sweep arc indicating "stale / aging" -->
+  <path d="M64 64 L64 26 A38 38 0 0 1 102 64 Z"
+        fill="#ff7a45" fill-opacity="0.55"/>
+</svg>

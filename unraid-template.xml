@@ -1,0 +1,230 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>dead-movies-shows</Name>
+  <Repository>ghcr.io/ososoba/unraid-dead-space:latest</Repository>
+  <Registry>https://github.com/ososoba/unraid-dead-space/pkgs/container/unraid-dead-space</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/ososoba/unraid-dead-space/issues</Support>
+  <Project>https://github.com/ososoba/unraid-dead-space</Project>
+  <Overview>
+Identify movies and shows in Sonarr/Radarr that nobody (or nobody who requested them) has watched.
+Joins Sonarr/Radarr inventory with Tautulli watch history and Overseerr/Seerr request data, then
+ranks reclaim candidates by size, age, and last-played date.
+
+Private app — no telemetry, no external services beyond your own *arr stack and Plex/Tautulli.
+
+First run setup:
+  1. Generate a bcrypt password hash:    docker exec dead-movies-shows python -m dms.cli.hash_password
+  2. Generate a session secret:          openssl rand -base64 32
+  3. Paste both into the template form (APP_PASSWORD_HASH, SESSION_SECRET).
+  4. Fill in your Sonarr/Radarr/Tautulli/Overseerr URLs + API keys (one slot per instance).
+  5. Save and start. Open the WebUI, sign in, click "Sync now" on /sync.
+  </Overview>
+  <Category>Tools: Productivity: MediaServer:Other</Category>
+  <WebUI>http://[IP]:[PORT:8765]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/ososoba/unraid-dead-space/main/unraid-template.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/ososoba/unraid-dead-space/main/unraid/icon.svg</Icon>
+  <ExtraParams>--restart=unless-stopped</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+
+  <!-- ============================================================ -->
+  <!-- Port + appdata                                                -->
+  <!-- ============================================================ -->
+  <Config Name="WebUI Port" Target="8765" Default="8765" Mode="tcp"
+          Description="Host port to expose the web UI on. Container port is fixed at 8765."
+          Type="Port" Display="always" Required="true" Mask="false">8765</Config>
+
+  <Config Name="Appdata" Target="/config" Default="/mnt/user/appdata/dead-movies-shows"
+          Mode="rw"
+          Description="Persistent state — SQLite DB and any future cached files. Required."
+          Type="Path" Display="always" Required="true" Mask="false"
+          >/mnt/user/appdata/dead-movies-shows</Config>
+
+  <!-- ============================================================ -->
+  <!-- Auth (REQUIRED for first run)                                 -->
+  <!-- ============================================================ -->
+  <Config Name="App username" Target="APP_USERNAME" Default="admin"
+          Description="Username you'll log in with."
+          Type="Variable" Display="always" Required="true" Mask="false">admin</Config>
+
+  <Config Name="App password (bcrypt hash)" Target="APP_PASSWORD_HASH" Default=""
+          Description="Generate via: docker exec dead-movies-shows python -m dms.cli.hash_password"
+          Type="Variable" Display="always" Required="true" Mask="true"></Config>
+
+  <Config Name="Session secret" Target="SESSION_SECRET" Default=""
+          Description="Random 32+ char string. Generate via: openssl rand -base64 32"
+          Type="Variable" Display="always" Required="true" Mask="true"></Config>
+
+  <Config Name="Cookie Secure flag" Target="COOKIE_SECURE" Default="false"
+          Description="Set to true if you ONLY access via HTTPS (e.g. tunnel-only). false works for both LAN HTTP and HTTPS proxy."
+          Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
+
+  <Config Name="Session lifetime (days)" Target="SESSION_DAYS" Default="90"
+          Description="How long a login session lasts before requiring re-auth."
+          Type="Variable" Display="advanced" Required="false" Mask="false">90</Config>
+
+  <!-- ============================================================ -->
+  <!-- Unraid runtime                                                -->
+  <!-- ============================================================ -->
+  <Config Name="PUID" Target="PUID" Default="99"
+          Description="User ID to run as. 99 = nobody on Unraid."
+          Type="Variable" Display="advanced" Required="false" Mask="false">99</Config>
+
+  <Config Name="PGID" Target="PGID" Default="100"
+          Description="Group ID to run as. 100 = users on Unraid."
+          Type="Variable" Display="advanced" Required="false" Mask="false">100</Config>
+
+  <Config Name="Timezone" Target="TZ" Default="America/Toronto"
+          Description="IANA timezone, e.g. America/Toronto, America/Vancouver, Europe/London."
+          Type="Variable" Display="always" Required="false" Mask="false">America/Toronto</Config>
+
+  <!-- ============================================================ -->
+  <!-- Sync schedule + watch logic                                   -->
+  <!-- ============================================================ -->
+  <Config Name="Sync cron" Target="SYNC_CRON" Default="0 4 * * *"
+          Description="Cron expression for scheduled sync. Default = 04:00 daily in your TZ."
+          Type="Variable" Display="advanced" Required="false" Mask="false">0 4 * * *</Config>
+
+  <Config Name="Watch scope (default view)" Target="WATCH_SCOPE" Default="anyone"
+          Description="anyone | requester. The dashboard has a per-page toggle; this is the default."
+          Type="Variable" Display="advanced" Required="false" Mask="false">anyone</Config>
+
+  <Config Name="Movies watch threshold (%)" Target="WATCH_THRESHOLD_MOVIES_PCT" Default="80"
+          Description="A movie counts as watched once a viewer reaches this % of completion."
+          Type="Variable" Display="advanced" Required="false" Mask="false">80</Config>
+
+  <Config Name="Episodes watch threshold (%)" Target="WATCH_THRESHOLD_EPISODES_PCT" Default="80"
+          Description="An episode counts as watched once a viewer reaches this % of completion."
+          Type="Variable" Display="advanced" Required="false" Mask="false">80</Config>
+
+  <Config Name="Specials handling" Target="SERIES_SPECIALS_MODE" Default="ignore"
+          Description="ignore | include. Whether season-0 specials count toward 'show finished'."
+          Type="Variable" Display="advanced" Required="false" Mask="false">ignore</Config>
+
+  <Config Name="Never-watched threshold (days)" Target="NEVER_WATCHED_DAYS" Default="90"
+          Description="Days since added before an unwatched item is flagged as a candidate."
+          Type="Variable" Display="advanced" Required="false" Mask="false">90</Config>
+
+  <Config Name="Stale threshold (days)" Target="STALE_DAYS" Default="180"
+          Description="Days since last play before a watched item is flagged stale."
+          Type="Variable" Display="advanced" Required="false" Mask="false">180</Config>
+
+  <Config Name="History retention (years)" Target="HISTORY_RETENTION_YEARS" Default="10"
+          Description="Cap on locally-mirrored Tautulli history."
+          Type="Variable" Display="advanced" Required="false" Mask="false">10</Config>
+
+  <Config Name="Sync HTTP timeout (s)" Target="HTTP_TIMEOUT_SECONDS" Default="30"
+          Description="Per-request HTTP timeout when calling upstream services."
+          Type="Variable" Display="advanced" Required="false" Mask="false">30</Config>
+
+  <Config Name="Sync max concurrency" Target="SYNC_MAX_CONCURRENCY" Default="4"
+          Description="Max parallel HTTP requests during sync."
+          Type="Variable" Display="advanced" Required="false" Mask="false">4</Config>
+
+  <Config Name="Backfill page size" Target="BACKFILL_PAGE_SIZE" Default="500"
+          Description="Tautulli history pull page size."
+          Type="Variable" Display="advanced" Required="false" Mask="false">500</Config>
+
+  <Config Name="Sync lock TTL (minutes)" Target="SYNC_LOCK_TTL_MINUTES" Default="120"
+          Description="If a sync's heartbeat hasn't updated in this many minutes, the lock is stealable."
+          Type="Variable" Display="advanced" Required="false" Mask="false">120</Config>
+
+  <!-- ============================================================ -->
+  <!-- Sonarr instance #1                                            -->
+  <!-- ============================================================ -->
+  <Config Name="Sonarr 1 — display name" Target="SONARR_1_NAME" Default="Sonarr 1080p"
+          Description="Friendly name shown in the UI."
+          Type="Variable" Display="always" Required="false" Mask="false">Sonarr 1080p</Config>
+  <Config Name="Sonarr 1 — URL" Target="SONARR_1_URL" Default="http://192.168.1.10:8989"
+          Description="Full URL incl. port. Use the LAN IP, not localhost."
+          Type="Variable" Display="always" Required="false" Mask="false"></Config>
+  <Config Name="Sonarr 1 — API key" Target="SONARR_1_API_KEY" Default=""
+          Description="Sonarr → Settings → General → API Key."
+          Type="Variable" Display="always" Required="false" Mask="true"></Config>
+
+  <!-- ============================================================ -->
+  <!-- Sonarr instance #2                                            -->
+  <!-- ============================================================ -->
+  <Config Name="Sonarr 2 — display name" Target="SONARR_2_NAME" Default="Sonarr 4K"
+          Description="Optional second Sonarr instance (e.g. 4K)."
+          Type="Variable" Display="advanced" Required="false" Mask="false">Sonarr 4K</Config>
+  <Config Name="Sonarr 2 — URL" Target="SONARR_2_URL" Default=""
+          Description="Leave blank if you only have one Sonarr instance."
+          Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="Sonarr 2 — API key" Target="SONARR_2_API_KEY" Default=""
+          Description=""
+          Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+
+  <!-- ============================================================ -->
+  <!-- Radarr instance #1                                            -->
+  <!-- ============================================================ -->
+  <Config Name="Radarr 1 — display name" Target="RADARR_1_NAME" Default="Radarr 1080p"
+          Description="Friendly name shown in the UI."
+          Type="Variable" Display="always" Required="false" Mask="false">Radarr 1080p</Config>
+  <Config Name="Radarr 1 — URL" Target="RADARR_1_URL" Default="http://192.168.1.10:7878"
+          Description="Full URL incl. port. Use the LAN IP, not localhost."
+          Type="Variable" Display="always" Required="false" Mask="false"></Config>
+  <Config Name="Radarr 1 — API key" Target="RADARR_1_API_KEY" Default=""
+          Description="Radarr → Settings → General → API Key."
+          Type="Variable" Display="always" Required="false" Mask="true"></Config>
+
+  <!-- ============================================================ -->
+  <!-- Radarr instance #2                                            -->
+  <!-- ============================================================ -->
+  <Config Name="Radarr 2 — display name" Target="RADARR_2_NAME" Default="Radarr 4K"
+          Description="Optional second Radarr instance (e.g. 4K)."
+          Type="Variable" Display="advanced" Required="false" Mask="false">Radarr 4K</Config>
+  <Config Name="Radarr 2 — URL" Target="RADARR_2_URL" Default=""
+          Description="Leave blank if you only have one Radarr instance."
+          Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="Radarr 2 — API key" Target="RADARR_2_API_KEY" Default=""
+          Description=""
+          Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+
+  <!-- ============================================================ -->
+  <!-- Tautulli                                                       -->
+  <!-- ============================================================ -->
+  <Config Name="Tautulli — URL" Target="TAUTULLI_URL" Default="http://192.168.1.10:8181"
+          Description="Tautulli web URL. Required if you want watch history."
+          Type="Variable" Display="always" Required="false" Mask="false"></Config>
+  <Config Name="Tautulli — API key" Target="TAUTULLI_API_KEY" Default=""
+          Description="Tautulli → Settings → Web Interface → API."
+          Type="Variable" Display="always" Required="false" Mask="true"></Config>
+
+  <!-- ============================================================ -->
+  <!-- Request services (Overseerr / Seerr / Jellyseerr)             -->
+  <!-- ============================================================ -->
+  <Config Name="Requester 1 — source" Target="REQUESTER_1_SOURCE" Default="overseerr"
+          Description="overseerr | seerr | jellyseerr | none"
+          Type="Variable" Display="always" Required="false" Mask="false">overseerr</Config>
+  <Config Name="Requester 1 — display name" Target="REQUESTER_1_NAME" Default="Overseerr 1080p"
+          Description="Friendly name shown in the UI."
+          Type="Variable" Display="always" Required="false" Mask="false">Overseerr 1080p</Config>
+  <Config Name="Requester 1 — URL" Target="REQUESTER_1_URL" Default="http://192.168.1.10:5055"
+          Description="Full URL incl. port."
+          Type="Variable" Display="always" Required="false" Mask="false"></Config>
+  <Config Name="Requester 1 — API key" Target="REQUESTER_1_API_KEY" Default=""
+          Description="Overseerr/Seerr → Settings → General → API Key."
+          Type="Variable" Display="always" Required="false" Mask="true"></Config>
+
+  <Config Name="Requester 2 — source" Target="REQUESTER_2_SOURCE" Default="overseerr"
+          Description="Optional second requester instance (e.g. for 4K, or during Overseerr → Seerr migration)."
+          Type="Variable" Display="advanced" Required="false" Mask="false">overseerr</Config>
+  <Config Name="Requester 2 — display name" Target="REQUESTER_2_NAME" Default="Overseerr 4K"
+          Description=""
+          Type="Variable" Display="advanced" Required="false" Mask="false">Overseerr 4K</Config>
+  <Config Name="Requester 2 — URL" Target="REQUESTER_2_URL" Default=""
+          Description=""
+          Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="Requester 2 — API key" Target="REQUESTER_2_API_KEY" Default=""
+          Description=""
+          Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+</Container>

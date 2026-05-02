@@ -70,9 +70,9 @@ Private Unraid container that identifies unwatched/stale media across Sonarr/Rad
 4. FastAPI shell + auth. ✓
 5. UI dashboards. ✓
 6. Sync UX (htmx live progress, scheduler, partial-failure banner). ✓
-7. **Containerization (Dockerfile, entrypoint, healthcheck, compose).** ✓
-8. Unraid Community Apps XML template.
-9. CI (GitHub Actions: ruff + pytest + buildx).
+7. Containerization (Dockerfile, entrypoint, healthcheck, compose). ✓
+8. **Unraid template (CA-compatible XML).** ✓
+9. CI (GitHub Actions: ruff + pytest + buildx + ghcr publish).
 
 ## Container
 

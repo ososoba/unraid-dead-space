@@ -2,7 +2,7 @@
 
 Private Unraid container that finds unwatched and stale media in your Sonarr/Radarr libraries by joining Tautulli watch history with Overseerr/Seerr request data. Reports reclaim candidates; does not delete.
 
-> Status: **Step 7 done — containerization.** Multi-stage Dockerfile, entrypoint with PUID/PGID + `gosu` privilege drop, `tini` PID 1, `/healthz` Docker healthcheck, `docker-compose.yml` for local dev. Unraid template next.
+> Status: **Step 8 done — Unraid template.** `unraid-template.xml` is CA-compatible: 1 port + 1 appdata mount + 42 env vars (9 masked secrets, 5 required, 28 advanced). Install from XML URL or paste-as-template in Unraid. CI publishing of the image is Step 9.
 
 ## Quick start (spike)
 
@@ -57,6 +57,29 @@ The container:
 - exposes `/healthz` for Docker's `HEALTHCHECK` (every 30s).
 
 `/config` is the only writable mount — SQLite DB lives there.
+
+## Install on Unraid
+
+1. **Wait for the image** — until Step 9 ships, the published image at
+   `ghcr.io/ososoba/unraid-dead-space:latest` doesn't exist. Build locally
+   and `docker tag` it to that name in the meantime.
+2. **Add the template:** Unraid → Docker → "Add Container" → Template URL:
+   ```
+   https://raw.githubusercontent.com/ososoba/unraid-dead-space/main/unraid-template.xml
+   ```
+3. **Fill in 5 required fields:**
+   - WebUI port (default `8765` is fine)
+   - Appdata path (default `/mnt/user/appdata/dead-movies-shows` is fine)
+   - App username (default `admin` is fine)
+   - **App password hash** — generate via:
+     ```
+     docker run --rm ghcr.io/ososoba/unraid-dead-space:latest python -m dms.cli.hash_password --plain YOUR_PASSWORD
+     ```
+   - **Session secret** — generate via `openssl rand -base64 32`.
+4. Open "Show advanced" to fill in your Sonarr/Radarr/Tautulli/Overseerr URLs
+   and API keys. Optional: tweak watch thresholds, sync cron, timezone.
+5. Apply, wait for the container's healthcheck to go green, browse to the
+   WebUI link in Unraid's Docker tab, sign in.
 
 The spike prints JSON to stdout: per-instance counts, identity-map stats, top candidates by reason. Use `--limit N` to cap rows, `--reason <name>` to filter.
 
