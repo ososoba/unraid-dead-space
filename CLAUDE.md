@@ -63,7 +63,7 @@ Private Unraid container that identifies unwatched/stale media across Sonarr/Rad
 - Stage specific files; never `git add .` or `git commit -a`.
 - Secrets only in `.env` (gitignored). Never log API keys.
 
-## Build order (current step in bold)
+## Build order — feature-complete
 1. CLI spike (read-only, no DB). ✓
 2. Schema + migrations. ✓
 3. Sync pipeline. ✓
@@ -71,8 +71,8 @@ Private Unraid container that identifies unwatched/stale media across Sonarr/Rad
 5. UI dashboards. ✓
 6. Sync UX (htmx live progress, scheduler, partial-failure banner). ✓
 7. Containerization (Dockerfile, entrypoint, healthcheck, compose). ✓
-8. **Unraid template (CA-compatible XML).** ✓
-9. CI (GitHub Actions: ruff + pytest + buildx + ghcr publish).
+8. Unraid template (CA-compatible XML). ✓
+9. **CI (GitHub Actions: ruff + pytest + buildx + ghcr publish).** ✓
 
 ## Container
 

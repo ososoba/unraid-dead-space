@@ -1,8 +1,10 @@
 # Dead Movies & Shows
 
+[![CI](https://github.com/ososoba/unraid-dead-space/actions/workflows/ci.yml/badge.svg)](https://github.com/ososoba/unraid-dead-space/actions/workflows/ci.yml)
+
 Private Unraid container that finds unwatched and stale media in your Sonarr/Radarr libraries by joining Tautulli watch history with Overseerr/Seerr request data. Reports reclaim candidates; does not delete.
 
-> Status: **Step 8 done — Unraid template.** `unraid-template.xml` is CA-compatible: 1 port + 1 appdata mount + 42 env vars (9 masked secrets, 5 required, 28 advanced). Install from XML URL or paste-as-template in Unraid. CI publishing of the image is Step 9.
+> Status: **Step 9 done — feature-complete.** All 9 steps in PLAN.md are shipped: CLI spike, schema + migrations, sync pipeline (with locks/tombstones/resumable backfill), FastAPI shell + auth, dashboards, htmx live sync UX, scheduler, container, Unraid template, GitHub Actions CI publishing multi-arch images to ghcr.io.
 
 ## Quick start (spike)
 
@@ -60,9 +62,10 @@ The container:
 
 ## Install on Unraid
 
-1. **Wait for the image** — until Step 9 ships, the published image at
-   `ghcr.io/ososoba/unraid-dead-space:latest` doesn't exist. Build locally
-   and `docker tag` it to that name in the meantime.
+1. **First push to `main` (or any `vX.Y.Z` tag) builds the image.** CI
+   publishes `ghcr.io/ososoba/unraid-dead-space:latest` (and `:main` /
+   `:vX.Y.Z`) for both `linux/amd64` and `linux/arm64`. Until that first
+   green run, no image exists yet — wait for the badge above to go green.
 2. **Add the template:** Unraid → Docker → "Add Container" → Template URL:
    ```
    https://raw.githubusercontent.com/ososoba/unraid-dead-space/main/unraid-template.xml
