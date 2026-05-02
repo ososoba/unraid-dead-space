@@ -43,21 +43,29 @@ class TautulliClient(BaseClient):
         return list(rows)
 
     async def library_media_info(
-        self, section_id: int, *, length: int = 1000
+        self, section_id: int, *, length: int = 1000, refresh: bool = True
     ) -> list[TautulliLibraryItem]:
-        """Page through one library section's media."""
+        """Page through one library section's media.
+
+        Tautulli caches `get_library_media_info` separately from Plex itself.
+        Without `refresh=true` on the first request, the cache may report
+        many fewer items than Plex actually has (we observed 354 vs 1048
+        on a real install). Default to refreshing on the first page; pass
+        `refresh=False` if you've just refreshed and want to repaginate.
+        """
         items: list[TautulliLibraryItem] = []
         start = 0
+        first = True
         while True:
-            data = (
-                await self._cmd(
-                    "get_library_media_info",
-                    section_id=section_id,
-                    start=start,
-                    length=length,
-                )
-                or {}
-            )
+            params: dict[str, Any] = {
+                "section_id": section_id,
+                "start": start,
+                "length": length,
+            }
+            if refresh and first:
+                params["refresh"] = "true"
+            data = await self._cmd("get_library_media_info", **params) or {}
+            first = False
             rows = data.get("data", []) if isinstance(data, dict) else []
             if not rows:
                 break
