@@ -1,0 +1,35 @@
+# Local-dev / smoke-test compose file. Production uses the Unraid template.
+#
+# Usage:
+#   docker compose up --build
+#   docker compose down
+#
+# Mounts:
+#   ./config        →  /config       (SQLite DB lives here)
+#   ./.env          →  read by the container at startup
+#
+# `network_mode: host` is convenient when your Sonarr/Radarr/Tautulli/Overseerr
+# instances are reachable on a non-routable LAN address (e.g. 172.16.0.22). On
+# Windows / Mac docker-desktop, host mode doesn't behave like Linux — comment
+# it out and use `network_mode: bridge` plus a `ports:` section instead.
+
+services:
+  dms:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dms
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DMS_DB_PATH: /config/db.sqlite
+      PUID: ${PUID:-99}
+      PGID: ${PGID:-100}
+      TZ: ${TZ:-America/Toronto}
+    volumes:
+      - ./config:/config
+    ports:
+      - "8765:8765"
+    # Uncomment for Linux when Arr/Tautulli are on the host network:
+    # network_mode: host

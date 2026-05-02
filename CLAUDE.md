@@ -69,8 +69,19 @@ Private Unraid container that identifies unwatched/stale media across Sonarr/Rad
 3. Sync pipeline. ✓
 4. FastAPI shell + auth. ✓
 5. UI dashboards. ✓
-6. **Sync UX (htmx live progress, scheduler, partial-failure banner).** ✓
-7. Containerization (Dockerfile, entrypoint, multi-arch).
+6. Sync UX (htmx live progress, scheduler, partial-failure banner). ✓
+7. **Containerization (Dockerfile, entrypoint, healthcheck, compose).** ✓
+8. Unraid Community Apps XML template.
+9. CI (GitHub Actions: ruff + pytest + buildx).
+
+## Container
+
+`Dockerfile` is multi-stage (`python:3.11-slim` builder → slim runtime), runs
+`tini` as PID 1, drops privileges via `gosu` per PUID/PGID. The bundled
+`entrypoint.sh` chowns `/config`. `docker-compose.yml` is for local dev.
+
+Tailwind was originally planned but skipped: ~80 lines of plain CSS does the
+job and avoids adding a Node toolchain to the image. Marked v2 if needed.
 4. FastAPI shell + auth.
 5. UI.
 6. Sync UX.

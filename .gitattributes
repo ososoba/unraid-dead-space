@@ -1,0 +1,7 @@
+# Force LF endings for files the Linux container reads.
+# Without this, Windows checkouts would write CRLF into the script and the
+# shebang `#!/usr/bin/env bash\r` would fail inside the container.
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+entrypoint* text eol=lf
+*.sql       text eol=lf
