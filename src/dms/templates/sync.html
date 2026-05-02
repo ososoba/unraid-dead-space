@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Sync — Dead Movies &amp; Shows{% endblock %}
+{% block head %}
+<script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+{% endblock %}
+{% block content %}
+<section>
+  <h1>Sync</h1>
+  <p>
+    <button id="sync-now-btn" class="action">Sync now</button>
+    <span id="sync-now-msg" class="status"></span>
+  </p>
+
+  {# The polling target. Reloads /sync/status/fragment every 2s while live. #}
+  <div id="sync-status"
+       hx-get="/sync/status/fragment"
+       hx-trigger="load, every 2s"
+       hx-swap="innerHTML">
+    {% include "_sync_status.html" %}
+  </div>
+</section>
+
+<script>
+const csrf = "{{ csrf_token(request) }}";
+document.getElementById('sync-now-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('sync-now-btn');
+  const msg = document.getElementById('sync-now-msg');
+  btn.disabled = true; msg.textContent = 'starting…';
+  const res = await fetch('/sync/run', {method: 'POST', headers: {'X-CSRF-Token': csrf}});
+  const data = await res.json();
+  btn.disabled = false;
+  if (!res.ok) {
+    msg.textContent = 'failed: ' + (data.error || res.status);
+    return;
+  }
+  msg.textContent = data.spawned ? 'started — watch progress below' : 'a sync is already running';
+  // Force a refresh of the fragment now (htmx polls every 2s otherwise).
+  htmx.trigger('#sync-status', 'load');
+});
+</script>
+{% endblock %}

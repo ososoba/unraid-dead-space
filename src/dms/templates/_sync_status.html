@@ -1,0 +1,31 @@
+{# htmx fragment: shown live on /sync and inline on the homepage. #}
+{% set run = data.run %}
+{% set steps = data.steps %}
+<div class="sync-status">
+  {% if not run %}
+    <p>No syncs yet.</p>
+  {% else %}
+    <p class="meta">
+      Run #{{ run.id }} ({{ run.kind }}) —
+      <strong>{{ run.status }}</strong>{% if data.task_running %} · live{% endif %}
+      <br/>started {{ run.started_at | humandate }}
+      {% if run.finished_at %} · finished {{ run.finished_at | humandate }}{% endif %}
+    </p>
+    {% if steps %}
+      <table class="steps">
+        <thead><tr><th>Step</th><th>Status</th><th>Seen</th><th>Changed</th><th>Error</th></tr></thead>
+        <tbody>
+          {% for s in steps %}
+            <tr class="step status-{{ s.status }}">
+              <td>{{ s.step_name }}</td>
+              <td>{{ s.status }}</td>
+              <td>{{ s.items_seen }}</td>
+              <td>{{ s.items_changed }}</td>
+              <td>{% if s.error_json %}<code class="err">{{ s.error_json | truncate(120) }}</code>{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  {% endif %}
+</div>

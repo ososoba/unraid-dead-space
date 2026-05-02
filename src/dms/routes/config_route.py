@@ -16,7 +16,6 @@ from dms.clients.requester import RequesterClient
 from dms.clients.tautulli import TautulliClient
 from dms.config import load_config
 from dms.deps import get_db
-from dms.sync.runner import run_sync
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -158,34 +157,6 @@ async def _test_requester(instance) -> tuple[bool, str]:
         return True, f"version={data.get('version', '?')}"
     except UpstreamError as exc:
         return False, str(exc)
-
-
-@router.post("/config/sync-now", include_in_schema=False)
-async def config_sync_now(
-    request: Request,
-    _: str = Depends(auth.require_login),
-    __: None = Depends(auth.require_csrf),
-    conn: sqlite3.Connection = Depends(get_db),
-) -> JSONResponse:
-    cfg = load_config()
-    if not cfg.arr_instances:
-        raise HTTPException(400, "no Arr instances configured")
-    user = auth.current_user(request) or "?"
-    with conn:
-        conn.execute(
-            "INSERT INTO audit_log (actor, action, target) "
-            "VALUES (?, 'sync_now', '/config/sync-now')",
-            (user,),
-        )
-    summary = await run_sync(conn, cfg, kind="manual", requested_by=user)
-    return JSONResponse(
-        {
-            "run_id": summary.run_id,
-            "status": summary.status,
-            "candidate_rows": summary.candidate_rows,
-            "watch_state_rows": summary.watch_state_rows,
-        }
-    )
 
 
 @router.post("/config/purge-history", include_in_schema=False)

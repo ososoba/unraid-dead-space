@@ -19,6 +19,7 @@
   {% endif %}
   <button class="action" data-action="sync-now">Sync now</button>
   <span id="sync-now-status" class="status"></span>
+  <p class="hint">Watch live progress on <a href="/sync">/sync</a>.</p>
 
   <h2>Connections</h2>
   <table class="instances">
@@ -126,10 +127,13 @@ document.querySelectorAll('button.action').forEach(btn => {
       btn.title = data.detail || '';
     } else if (a === 'sync-now') {
       const status = document.getElementById('sync-now-status');
-      btn.disabled = true; status.textContent = 'syncing…';
-      const data = await post('/config/sync-now');
+      btn.disabled = true; status.textContent = 'starting…';
+      const data = await post('/sync/run');
       btn.disabled = false;
-      status.textContent = `run #${data.run_id} → ${data.status} (${data.candidate_rows} candidates)`;
+      if (!data.ok) { status.textContent = 'failed: ' + (data.error || ''); return; }
+      status.textContent = data.spawned
+        ? 'started — watch progress at /sync'
+        : 'a sync is already running (see /sync)';
     } else if (a === 'purge-history') {
       if (!confirm('Delete all locally-mirrored watch history? Tautulli is unaffected.')) return;
       const status = document.getElementById('purge-status');

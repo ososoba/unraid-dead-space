@@ -23,7 +23,17 @@ from starlette.middleware.sessions import SessionMiddleware
 from dms import auth, formatters
 from dms.db import DEFAULT_DB_PATH, connect
 from dms.migrations import apply_pending
-from dms.routes import config_route, healthz, home, ignored, instance, login, requesters
+from dms.routes import (
+    config_route,
+    healthz,
+    home,
+    ignored,
+    instance,
+    login,
+    requesters,
+    sync_route,
+)
+from dms.scheduler import build_scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -42,11 +52,13 @@ def create_app(
     *,
     db_path: str | PathLike[str] | None = None,
     apply_migrations: bool = True,
+    enable_scheduler: bool = True,
 ) -> FastAPI:
     """Build the FastAPI app. Tests pass a tmp_path DB; runtime uses default
     (or DMS_DB_PATH env var if set by the serve CLI)."""
     if db_path is None:
         import os
+
         db_path = os.environ.get("DMS_DB_PATH") or DEFAULT_DB_PATH
 
     @asynccontextmanager
@@ -57,7 +69,16 @@ def create_app(
                 apply_pending(conn)
             finally:
                 conn.close()
-        yield
+        scheduler = build_scheduler(db_path) if enable_scheduler else None
+        if scheduler is not None:
+            scheduler.start()
+            logger.info("scheduler started; next run at %s", _next_fire(scheduler))
+            app.state.scheduler = scheduler
+        try:
+            yield
+        finally:
+            if scheduler is not None:
+                scheduler.shutdown(wait=False)
 
     app = FastAPI(
         title="Dead Movies & Shows",
@@ -91,5 +112,11 @@ def create_app(
     app.include_router(instance.router)  # `/instance/{slug}`
     app.include_router(requesters.router)  # `/requesters`
     app.include_router(ignored.router)  # `/ignored` + `/items/.../ignore`
+    app.include_router(sync_route.router)  # `/sync`, `/sync/run`, `/sync/status`
 
     return app
+
+
+def _next_fire(scheduler) -> str:
+    job = scheduler.get_job("dms_scheduled_sync")
+    return str(job.next_run_time) if job and job.next_run_time else "unscheduled"

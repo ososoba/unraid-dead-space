@@ -42,7 +42,10 @@ Private Unraid container that identifies unwatched/stale media across Sonarr/Rad
 - `src/dms/deps.py` — per-request DB dependency.
 - `src/dms/settings_store.py` — config-table-backed settings + env precedence.
 - `src/dms/routes/` — HTTP routes: `login`, `healthz`, `config_route`,
-  `home` (`/`), `instance` (`/instance/{slug}`), `requesters`, `ignored`.
+  `home` (`/`), `instance` (`/instance/{slug}`), `requesters`, `ignored`,
+  `sync_route` (`/sync`, `/sync/run`, `/sync/status`).
+- `src/dms/scheduler.py` — APScheduler cron job at `SYNC_CRON`.
+- `src/dms/sync/background.py` — fire-and-forget runner with in-process dedup.
 - `src/dms/views/` — read-side query helpers (`candidates`, `summary`).
 - `src/dms/formatters.py` — Jinja filters (humansize, humandate, percent).
 - `src/dms/templates/`, `src/dms/static/` — Jinja2 + plain CSS (Tailwind in Step 7).
@@ -65,8 +68,9 @@ Private Unraid container that identifies unwatched/stale media across Sonarr/Rad
 2. Schema + migrations. ✓
 3. Sync pipeline. ✓
 4. FastAPI shell + auth. ✓
-5. **UI dashboards.** ✓
-6. Sync UX (htmx live progress, partial-failure banner polish).
+5. UI dashboards. ✓
+6. **Sync UX (htmx live progress, scheduler, partial-failure banner).** ✓
+7. Containerization (Dockerfile, entrypoint, multi-arch).
 4. FastAPI shell + auth.
 5. UI.
 6. Sync UX.

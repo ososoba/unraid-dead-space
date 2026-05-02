@@ -76,3 +76,13 @@ nav.pager { display: flex; gap: 0.7rem; align-items: center; margin: 1rem 0; }
 nav.pager a { text-decoration: none; }
 
 .meta { color: #666; font-size: 0.9em; }
+
+/* Sync status table */
+.sync-status .steps { width: auto; min-width: 70%; }
+.sync-status .steps td { vertical-align: top; }
+.sync-status .steps tr.status-running { background: #eef6ff; }
+.sync-status .steps tr.status-failed { background: #fdecea; color: #5c1a17; }
+.sync-status .steps tr.status-skipped { color: #888; }
+.sync-status .steps tr.status-succeeded { background: #f1f8e9; }
+.sync-status .steps .err { white-space: normal; word-break: break-word; }
+ul.failed-steps li code { background: #f6e9e8; }

@@ -5,16 +5,23 @@
   <h1>Dashboard</h1>
 
   {% if failed_steps %}
-    <div class="banner warn">
-      <strong>Last sync had {{ failed_steps|length }} failed step(s):</strong>
-      {% for f in failed_steps %}<code>{{ f.step_name }}</code>{% if not loop.last %}, {% endif %}{% endfor %}.
-      Showing last-known-good data for affected sources.
-    </div>
+    <details class="banner warn">
+      <summary><strong>Last sync had {{ failed_steps|length }} failed step(s):</strong>
+        {% for f in failed_steps %}<code>{{ f.step_name }}</code>{% if not loop.last %}, {% endif %}{% endfor %}.
+        Showing last-known-good data for affected sources.
+      </summary>
+      <ul class="failed-steps">
+        {% for f in failed_steps %}
+          <li><code>{{ f.step_name }}</code>: {{ f.error or '—' }}</li>
+        {% endfor %}
+      </ul>
+    </details>
   {% endif %}
 
   <p class="meta">
     Last sync: run #{{ run.id }} ({{ run.kind }}, {{ run.status }}) —
-    {{ run.finished_at or run.started_at }}
+    {{ run.finished_at or run.started_at }} ·
+    <a href="/sync">view live progress / sync now →</a>
   </p>
 
   <div class="cards">
