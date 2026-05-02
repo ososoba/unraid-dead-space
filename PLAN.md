@@ -534,6 +534,16 @@ unraid-space-saver/
 
 ## 14. Open Items / v2+
 
+- **Episode-level Plex inventory.** Today the Plex sync only fetches
+  `get_metadata` for show-level rating keys, which rarely populates
+  `media_info[].parts[]` — so series orphan detection falls back to
+  external-ID matching and the file-level fix from decision #19 is a no-op
+  for series in practice. Movie orphan detection is unaffected. The fix is
+  to walk shows → seasons → episodes (e.g. `get_children_metadata` per
+  show, ~1 call/show vs ~30 calls/show for per-episode get_metadata) and
+  store episode-level `plex_items` + `plex_media_files` rows. Roughly
+  doubles sync time. `candidates_db._log_series_size_coverage` warns at
+  runtime when this limitation is biting.
 - **Delete from Arr** action (gated behind feature flag).
 - **Per-show season-level breakdown** in deepdive.
 - **Duplicate quality copy** badge (informational only, not a candidate reason — user explicitly wants instances treated independently).

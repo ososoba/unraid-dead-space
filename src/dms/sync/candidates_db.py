@@ -10,12 +10,53 @@ filters by `computed_at_sync_run_id = (latest succeeded)`.
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 from datetime import UTC, datetime
+
+logger = logging.getLogger(__name__)
 
 
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _log_series_size_coverage(conn: sqlite3.Connection) -> None:
+    """Surface a warning when series orphan detection has degraded to
+    external-ID matching because Plex isn't returning aggregate file sizes.
+
+    See `7b` SQL block for the underlying limitation. We log a single
+    INFO line per sync if >50% of series-section plex_items have no
+    media-file size data, because that's when the file-level fix from
+    PLAN.md decision #19 is effectively a no-op.
+    """
+    row = conn.execute(
+        """
+        SELECT
+          SUM(CASE WHEN COALESCE(pmf.total, 0) > 0 THEN 1 ELSE 0 END) AS with_size,
+          COUNT(*) AS total
+        FROM plex_items pi
+        LEFT JOIN (
+          SELECT plex_item_id, SUM(size_bytes) AS total
+          FROM plex_media_files
+          WHERE deleted_at IS NULL
+          GROUP BY plex_item_id
+        ) pmf ON pmf.plex_item_id = pi.id
+        WHERE pi.deleted_at IS NULL AND pi.kind IN ('show', 'series')
+        """
+    ).fetchone()
+    total = int(row["total"] or 0)
+    if total == 0:
+        return
+    with_size = int(row["with_size"] or 0)
+    if with_size * 2 < total:
+        logger.info(
+            "series orphan detection degraded: %d/%d Plex shows have no "
+            "aggregate file size — split-quality Sonarr instances may not "
+            "be flagged. v2 episode-level Plex inventory will fix this.",
+            total - with_size,
+            total,
+        )
 
 
 def compute_candidates(
@@ -208,14 +249,27 @@ def compute_candidates(
             params,
         )
 
-        # 7b. orphan_arr_no_plex (series) — file-level matching by aggregate.
-        # We sum arr_files per series (v_arr_item_size already does this) and
-        # plex_media_files per matching show, then compare with a 5% tolerance.
-        # This catches the split-quality Sonarr case (1080p vs 4K Sonarr,
-        # Plex has only one): the size sums won't match, so the unmatched
-        # quality flags as orphan.
-        # Per-episode-file matching is still v2 (would need episode-level
-        # plex_items + plex_media_files, which the current sync doesn't fetch).
+        # 7b. orphan_arr_no_plex (series) — best-effort file-level by aggregate.
+        #
+        # KNOWN LIMITATION (PLAN.md v2 item: episode-level Plex inventory):
+        # The current Plex sync only calls get_metadata() on the rating keys
+        # returned by get_library_media_info, which for TV sections are
+        # SHOW-level keys. Show metadata in Tautulli's media_info[] array is
+        # usually empty (parts/file are episode-level concepts). So in
+        # practice `pmf_total IS NULL` for most shows, and the lenient branch
+        # below collapses this back to external-ID-only matching for series.
+        #
+        # When `pmf_total > 0` (rare today, common after the v2 episode-level
+        # inventory pass), the size-sum comparison kicks in and catches
+        # split-quality Sonarr instances (1080p vs 4K, Plex has only one).
+        #
+        # Why we keep the lenient fallback today: tightening it would
+        # generate false-positive orphans for *every* series with Plex's
+        # show-level metadata returning no parts (i.e. nearly all series
+        # right now). Better to under-report than to drown the user in noise.
+        #
+        # Movie orphan detection (7a above) does NOT have this limitation:
+        # movie metadata DOES populate media_info[].parts[] reliably.
         conn.execute(
             """
             INSERT INTO candidates
@@ -294,6 +348,9 @@ def compute_candidates(
 
         # Prune all but last N successful runs' candidates.
         _prune_old_runs(conn, run_id=run_id, keep=keep_last_n_runs)
+
+        # Surface the series-orphan limitation if it's biting this install.
+        _log_series_size_coverage(conn)
 
         cnt = conn.execute(
             "SELECT COUNT(*) FROM candidates WHERE computed_at_sync_run_id = ?",
