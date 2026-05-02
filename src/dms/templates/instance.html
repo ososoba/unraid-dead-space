@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}{{ instance.name }} — Dead Movies &amp; Shows{% endblock %}
+{% block content %}
+{% set qs_base = "tab=" ~ tab ~ "&scope=" ~ scope ~ "&state=" ~ state ~ "&sort=" ~ sort ~ "&per_page=" ~ per_page %}
+<section>
+  <h1>{{ instance.name }} <span class="hint">({{ instance.kind }})</span></h1>
+
+  <nav class="tabs">
+    {% for t in ['never', 'stale', 'orphans'] %}
+      <a class="{% if tab == t %}active{% endif %}"
+         href="/instance/{{ instance.slug }}?tab={{ t }}&scope={{ scope }}&state={{ state }}&sort={{ sort }}">
+        {{ {'never':'Never Watched','stale':'Stale','orphans':'Orphans'}[t] }}
+      </a>
+    {% endfor %}
+    <a href="/ignored?from=/instance/{{ instance.slug }}">Ignored</a>
+  </nav>
+
+  <form method="get" class="filters">
+    <input type="hidden" name="tab" value="{{ tab }}" />
+    <label>Scope
+      <select name="scope" onchange="this.form.submit()">
+        <option value="anyone" {% if scope == 'anyone' %}selected{% endif %}>Anyone</option>
+        <option value="requester" {% if scope == 'requester' %}selected{% endif %}>Requester</option>
+      </select>
+    </label>
+    {% if tab == 'stale' %}
+      <label>State
+        <select name="state" onchange="this.form.submit()">
+          <option value="all" {% if state == 'all' %}selected{% endif %}>All</option>
+          <option value="finished" {% if state == 'finished' %}selected{% endif %}>Finished</option>
+          <option value="partial" {% if state == 'partial' %}selected{% endif %}>Partial</option>
+        </select>
+      </label>
+    {% endif %}
+    <label>Sort
+      <select name="sort" onchange="this.form.submit()">
+        <option value="size" {% if sort == 'size' %}selected{% endif %}>Largest first</option>
+        <option value="added" {% if sort == 'added' %}selected{% endif %}>Oldest add date</option>
+        <option value="last_played" {% if sort == 'last_played' %}selected{% endif %}>Oldest last play</option>
+        <option value="coverage" {% if sort == 'coverage' %}selected{% endif %}>Lowest watch %</option>
+      </select>
+    </label>
+    <label>Per page
+      <select name="per_page" onchange="this.form.submit()">
+        {% for n in [25, 50, 100, 200] %}
+          <option value="{{ n }}" {% if per_page == n %}selected{% endif %}>{{ n }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <noscript><button type="submit">Apply</button></noscript>
+  </form>
+
+  <p class="meta">{{ total }} candidate{% if total != 1 %}s{% endif %}</p>
+
+  {% if rows %}
+    <table class="candidates">
+      <thead>
+        <tr>
+          <th>Title</th><th>Reason</th><th>Requester</th>
+          <th>Added</th><th>Last play</th><th>Watch %</th><th>Size</th><th>Conf</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr class="row {% if r.confidence == 'low' %}low-conf{% endif %}">
+            <td>
+              <details>
+                <summary><strong>{{ r.title }}</strong>{% if r.year %} ({{ r.year }}){% endif %}</summary>
+                <div class="why">
+                  <div><strong>Reason:</strong> {{ reason_label(r.reason) }} ({{ r.scope }})</div>
+                  {% if r.requester_name %}<div><strong>Requester:</strong> {{ r.requester_name }}{% if r.requester_source %} via {{ r.requester_source }}{% endif %}</div>{% endif %}
+                  <div><strong>Added:</strong> {{ r.age_days or '—' }} days ago</div>
+                  <div><strong>Last play (anyone):</strong> {{ r.last_played_at_anyone | humandate }}</div>
+                  <div><strong>Last play (requester):</strong> {{ r.last_played_at_requester | humandate }}</div>
+                  {% if r.coverage_anyone is not none %}
+                    <div><strong>Episode coverage (anyone):</strong> {{ r.coverage_anyone | percent }}</div>
+                    <div><strong>Episode coverage (requester):</strong> {{ r.coverage_requester | percent }}</div>
+                  {% endif %}
+                  <div><strong>Plex match:</strong>
+                    {% if r.plex_item_id %}yes{% if r.plex_file_path %} ({{ r.plex_file_path }}){% endif %}{% else %}no — orphan{% endif %}
+                  </div>
+                  <div><strong>Instance:</strong> {{ r.instance_name or '—' }}</div>
+                  <div><strong>Confidence:</strong> {{ r.confidence }}</div>
+                </div>
+              </details>
+            </td>
+            <td>{{ reason_label(r.reason) }}</td>
+            <td>{{ r.requester_name or '—' }}</td>
+            <td>{% if r.age_days is not none %}{{ r.age_days }}d{% else %}—{% endif %}</td>
+            <td>{{ r.last_played_at | humandate }}</td>
+            <td>
+              {% if scope == 'requester' and r.coverage_requester is not none %}
+                {{ r.coverage_requester | percent }}
+              {% elif r.coverage_anyone is not none %}
+                {{ r.coverage_anyone | percent }}
+              {% else %}—{% endif %}
+            </td>
+            <td>{{ r.size_bytes | humansize }}</td>
+            <td>{{ r.confidence }}</td>
+            <td>
+              {% if r.arr_item_id %}
+                <button class="action ignore-btn" data-id="{{ r.arr_item_id }}">Ignore</button>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if pages > 1 %}
+      <nav class="pager">
+        {% if page > 1 %}
+          <a href="?{{ qs_base }}&page={{ page - 1 }}">← prev</a>
+        {% endif %}
+        <span>page {{ page }} / {{ pages }}</span>
+        {% if page < pages %}
+          <a href="?{{ qs_base }}&page={{ page + 1 }}">next →</a>
+        {% endif %}
+      </nav>
+    {% endif %}
+  {% else %}
+    <p>No candidates in this view.</p>
+  {% endif %}
+</section>
+
+<script>
+const csrf = "{{ csrf_token(request) }}";
+document.querySelectorAll('button.ignore-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const id = btn.dataset.id;
+    btn.disabled = true; btn.textContent = '…';
+    const res = await fetch('/items/' + id + '/ignore', {
+      method: 'POST',
+      headers: {'X-CSRF-Token': csrf}
+    });
+    if (res.ok) {
+      btn.closest('tr').classList.add('ignored');
+      btn.textContent = 'Ignored';
+    } else {
+      btn.disabled = false; btn.textContent = 'Failed';
+    }
+  });
+});
+</script>
+{% endblock %}

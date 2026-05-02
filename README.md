@@ -2,7 +2,7 @@
 
 Private Unraid container that finds unwatched and stale media in your Sonarr/Radarr libraries by joining Tautulli watch history with Overseerr/Seerr request data. Reports reclaim candidates; does not delete.
 
-> Status: **Step 4 done — FastAPI shell + auth.** Steps 1–4 in: CLI spike, schema, sync pipeline, and now the web app (login + CSRF + config page + sync trigger + `/healthz`). UI dashboards next.
+> Status: **Step 5 done — UI dashboards.** Homepage cards, per-instance deepdive (Never Watched / Stale / Orphans tabs with sort + pagination + scope toggle + "Why is this listed?" drawer), Requesters summary, Ignored list with one-click ignore/restore. Sync UX polish next.
 
 ## Quick start (spike)
 

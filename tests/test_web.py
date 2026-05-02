@@ -52,10 +52,10 @@ def test_healthz_no_auth(client: TestClient) -> None:
 # ---------- Auth ----------
 
 
-def test_root_redirects_to_login_when_anonymous(client: TestClient) -> None:
+def test_root_requires_auth_when_anonymous(client: TestClient) -> None:
     r = client.get("/", follow_redirects=False)
-    assert r.status_code == 302
-    assert r.headers["location"] == "/login"
+    # require_login raises 401; redirect-to-login is the UX layer's job.
+    assert r.status_code == 401
 
 
 def test_login_form_renders(client: TestClient) -> None:
@@ -86,11 +86,12 @@ def test_login_redirects_on_success(client: TestClient) -> None:
     assert "dms_session" in r.cookies or any(c.name == "dms_session" for c in client.cookies.jar)
 
 
-def test_authenticated_root_redirects_to_config(client: TestClient) -> None:
+def test_authenticated_root_renders_dashboard(client: TestClient) -> None:
     client.post("/login", data={"username": TEST_USERNAME, "password": TEST_PASSWORD})
-    r = client.get("/", follow_redirects=False)
-    assert r.status_code == 302
-    assert r.headers["location"] == "/config"
+    r = client.get("/")
+    assert r.status_code == 200
+    # Empty-state homepage on a fresh DB.
+    assert b"No syncs yet" in r.content
 
 
 def test_config_requires_login(client: TestClient) -> None:

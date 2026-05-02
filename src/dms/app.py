@@ -15,16 +15,15 @@ import logging
 from contextlib import asynccontextmanager
 from os import PathLike
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
-from starlette.responses import RedirectResponse, Response
 
-from dms import auth
+from dms import auth, formatters
 from dms.db import DEFAULT_DB_PATH, connect
 from dms.migrations import apply_pending
-from dms.routes import config_route, healthz, login
+from dms.routes import config_route, healthz, home, ignored, instance, login, requesters
 
 logger = logging.getLogger(__name__)
 
@@ -32,15 +31,23 @@ logger = logging.getLogger(__name__)
 def _build_templates(package_dir: str) -> Jinja2Templates:
     templates = Jinja2Templates(directory=f"{package_dir}/templates")
     templates.env.globals["csrf_token"] = lambda request: auth.get_or_set_csrf(request)
+    templates.env.filters["humansize"] = formatters.humansize
+    templates.env.filters["humandate"] = formatters.humandate
+    templates.env.filters["relative_days"] = formatters.relative_days
+    templates.env.filters["percent"] = formatters.percent
     return templates
 
 
 def create_app(
     *,
-    db_path: str | PathLike[str] = DEFAULT_DB_PATH,
+    db_path: str | PathLike[str] | None = None,
     apply_migrations: bool = True,
 ) -> FastAPI:
-    """Build the FastAPI app. Tests pass a tmp_path DB; runtime uses default."""
+    """Build the FastAPI app. Tests pass a tmp_path DB; runtime uses default
+    (or DMS_DB_PATH env var if set by the serve CLI)."""
+    if db_path is None:
+        import os
+        db_path = os.environ.get("DMS_DB_PATH") or DEFAULT_DB_PATH
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -80,12 +87,9 @@ def create_app(
     app.include_router(healthz.router)
     app.include_router(login.router)
     app.include_router(config_route.router)
-
-    @app.get("/", include_in_schema=False)
-    async def root(request: Request) -> Response:
-        if not auth.is_authenticated(request):
-            return RedirectResponse(url="/login", status_code=302)
-        # Step 5 will replace this with the homepage. For now, send to /config.
-        return RedirectResponse(url="/config", status_code=302)
+    app.include_router(home.router)  # `/`
+    app.include_router(instance.router)  # `/instance/{slug}`
+    app.include_router(requesters.router)  # `/requesters`
+    app.include_router(ignored.router)  # `/ignored` + `/items/.../ignore`
 
     return app

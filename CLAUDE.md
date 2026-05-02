@@ -41,9 +41,11 @@ Private Unraid container that identifies unwatched/stale media across Sonarr/Rad
 - `src/dms/auth.py` — session cookie + CSRF + login_required dep.
 - `src/dms/deps.py` — per-request DB dependency.
 - `src/dms/settings_store.py` — config-table-backed settings + env precedence.
-- `src/dms/routes/` — HTTP routes: `login`, `healthz`, `config_route`.
+- `src/dms/routes/` — HTTP routes: `login`, `healthz`, `config_route`,
+  `home` (`/`), `instance` (`/instance/{slug}`), `requesters`, `ignored`.
+- `src/dms/views/` — read-side query helpers (`candidates`, `summary`).
+- `src/dms/formatters.py` — Jinja filters (humansize, humandate, percent).
 - `src/dms/templates/`, `src/dms/static/` — Jinja2 + plain CSS (Tailwind in Step 7).
-- (Future) homepage + instance deepdive routes (Step 5).
 
 ## Authoritative docs
 - `PLAN.md` — full implementation plan, schema, decisions log. Update when decisions change.
@@ -62,8 +64,9 @@ Private Unraid container that identifies unwatched/stale media across Sonarr/Rad
 1. CLI spike (read-only, no DB). ✓
 2. Schema + migrations. ✓
 3. Sync pipeline. ✓
-4. **FastAPI shell + auth.** ✓
-5. UI dashboards.
+4. FastAPI shell + auth. ✓
+5. **UI dashboards.** ✓
+6. Sync UX (htmx live progress, partial-failure banner polish).
 4. FastAPI shell + auth.
 5. UI.
 6. Sync UX.

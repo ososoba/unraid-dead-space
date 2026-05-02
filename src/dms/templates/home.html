@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Dead Movies &amp; Shows{% endblock %}
+{% block content %}
+<section>
+  <h1>Dashboard</h1>
+
+  {% if failed_steps %}
+    <div class="banner warn">
+      <strong>Last sync had {{ failed_steps|length }} failed step(s):</strong>
+      {% for f in failed_steps %}<code>{{ f.step_name }}</code>{% if not loop.last %}, {% endif %}{% endfor %}.
+      Showing last-known-good data for affected sources.
+    </div>
+  {% endif %}
+
+  <p class="meta">
+    Last sync: run #{{ run.id }} ({{ run.kind }}, {{ run.status }}) —
+    {{ run.finished_at or run.started_at }}
+  </p>
+
+  <div class="cards">
+    <div class="card big">
+      <div class="num">{{ headline_bytes | humansize }}</div>
+      <div class="lbl">total reclaim potential</div>
+      <div class="sub">{{ headline_items }} items across all reasons</div>
+    </div>
+    {% for r in reasons %}
+      <div class="card">
+        <div class="num">{{ r.total_bytes | humansize }}</div>
+        <div class="lbl">{{ reason_label(r.reason) }}</div>
+        <div class="sub">{{ r.count }} item{% if r.count != 1 %}s{% endif %}</div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <h2>Never watched, by age</h2>
+  <table>
+    <thead><tr><th>Age (days since added)</th><th>Items</th><th>Total size</th></tr></thead>
+    <tbody>
+      {% for b in age_buckets %}
+        <tr>
+          <td>{{ b.label }}</td>
+          <td>{{ b.count }}</td>
+          <td>{{ b.total_bytes | humansize }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Per Arr instance</h2>
+  <div class="cards">
+    {% for i in instances %}
+      <a class="card link" href="/instance/{{ i.slug }}">
+        <div class="num">{{ i.total_bytes | humansize }}</div>
+        <div class="lbl">{{ i.name }} <span class="hint">({{ i.kind }})</span></div>
+        <div class="sub">
+          {{ i.item_count }} items
+          {% if i.last_seen_ok_at %}
+            · ok {{ i.last_seen_ok_at | relative_days }}
+          {% else %}
+            · never synced
+          {% endif %}
+          {% if i.last_error %}<br/><span class="error">last error: {{ i.last_error }}</span>{% endif %}
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+
+  <p><a href="/requesters">View by requester →</a> · <a href="/ignored">Ignored items →</a></p>
+</section>
+{% endblock %}

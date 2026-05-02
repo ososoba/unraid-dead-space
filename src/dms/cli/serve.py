@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 
 import uvicorn
 
@@ -18,6 +19,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="dms.cli.serve")
     parser.add_argument("--host", default="0.0.0.0")  # noqa: S104 — bind-all is intentional for container
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--db", default=None, help="SQLite path (overrides ./config/db.sqlite)")
     parser.add_argument("--reload", action="store_true", help="Auto-reload on source change")
     parser.add_argument("--workers", type=int, default=1, help="Must stay 1 for APScheduler")
     parser.add_argument("--log-level", default="info")
@@ -29,6 +31,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=args.log_level.upper())
+
+    # `factory=True` calls dms.app.create_app() with no args — propagate
+    # --db via env so the factory can pick it up.
+    if args.db is not None:
+        os.environ["DMS_DB_PATH"] = str(args.db)
 
     uvicorn.run(
         "dms.app:create_app",

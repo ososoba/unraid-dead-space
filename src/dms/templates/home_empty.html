@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Dead Movies &amp; Shows{% endblock %}
+{% block content %}
+<section>
+  <h1>Welcome</h1>
+  <p>No syncs yet. Run one to populate the dashboard.</p>
+  <p>
+    <a href="/config">Open Config</a> and click <strong>Sync now</strong>,
+    or run <code>python -m dms.cli.sync</code> from the shell.
+  </p>
+</section>
+{% endblock %}

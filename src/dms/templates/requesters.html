@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Requesters — Dead Movies &amp; Shows{% endblock %}
+{% block content %}
+<section>
+  <h1>By requester</h1>
+  {% if not run %}
+    <p>No syncs yet. Run one from <a href="/config">Config</a>.</p>
+  {% elif not totals %}
+    <p>No requesters known.</p>
+  {% else %}
+    <p class="meta">From sync run #{{ run.id }} ({{ run.status }}).</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Requester</th>
+          <th>Items</th>
+          <th>Total size</th>
+          <th>Never watched (anyone)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in totals %}
+          <tr>
+            <td>{{ t.name }}</td>
+            <td>{{ t.item_count }}</td>
+            <td>{{ t.total_bytes | humansize }}</td>
+            <td>{{ t.never_watched_count }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</section>
+{% endblock %}

@@ -13,6 +13,9 @@
     <a href="/" class="brand">Dead Movies &amp; Shows</a>
     {% if user %}
       <nav>
+        <a href="/">Dashboard</a>
+        <a href="/requesters">Requesters</a>
+        <a href="/ignored">Ignored</a>
         <a href="/config">Config</a>
         <form method="post" action="/logout" class="inline">
           <input type="hidden" name="_csrf" value="{{ csrf_token(request) }}" />

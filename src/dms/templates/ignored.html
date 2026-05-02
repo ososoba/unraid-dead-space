@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Ignored — Dead Movies &amp; Shows{% endblock %}
+{% block content %}
+<section>
+  <h1>Ignored items</h1>
+  <p class="hint">
+    These items are excluded from candidate lists. The exclusion is app-local;
+    Sonarr/Radarr are not modified.
+  </p>
+  {% if not rows %}
+    <p>Nothing ignored. Click <strong>Ignore</strong> on a candidate row to add it.</p>
+  {% else %}
+    <table>
+      <thead>
+        <tr><th>Title</th><th>Instance</th><th>Requester</th><th>Size</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr data-id="{{ r.id }}">
+            <td><strong>{{ r.title }}</strong>{% if r.year %} ({{ r.year }}){% endif %} <span class="hint">[{{ r.kind }}]</span></td>
+            <td>{{ r.instance_name }} <span class="hint">({{ r.slug }})</span></td>
+            <td>{{ r.requester_name or '—' }}</td>
+            <td>{{ r.size_bytes | humansize }}</td>
+            <td><button class="action unignore-btn" data-id="{{ r.id }}">Restore</button></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</section>
+
+<script>
+const csrf = "{{ csrf_token(request) }}";
+document.querySelectorAll('button.unignore-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    btn.disabled = true; btn.textContent = '…';
+    const res = await fetch('/items/' + btn.dataset.id + '/unignore', {
+      method: 'POST',
+      headers: {'X-CSRF-Token': csrf}
+    });
+    if (res.ok) {
+      const tr = btn.closest('tr');
+      tr.parentElement.removeChild(tr);
+    } else {
+      btn.disabled = false; btn.textContent = 'Failed';
+    }
+  });
+});
+</script>
+{% endblock %}
