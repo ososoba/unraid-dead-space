@@ -8,6 +8,7 @@ section.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from typing import Any
 
 from dms.clients.base import BaseClient, UpstreamError
@@ -78,23 +79,52 @@ class TautulliClient(BaseClient):
     async def history(
         self, *, length: int = 500, after_row_id: int | None = None
     ) -> list[TautulliHistoryRow]:
-        """Page through history. `after_row_id` for incremental sync."""
+        """Convenience: drain `iter_history` into a list. Avoid for large pulls;
+        use `iter_history` so each page can be persisted before the next request."""
         rows: list[TautulliHistoryRow] = []
+        async for page in self.iter_history(length=length, after_row_id=after_row_id):
+            rows.extend(page)
+        return rows
+
+    async def iter_history(
+        self,
+        *,
+        length: int = 500,
+        after_row_id: int | None = None,
+        not_before_unix: int | None = None,
+    ) -> AsyncIterator[list[TautulliHistoryRow]]:
+        """Yield `get_history` page-by-page so the caller can persist + checkpoint
+        between pages. Stops when:
+          - the page is empty / short (end of history),
+          - `after_row_id` is set and an older row appears (incremental cutoff),
+          - `not_before_unix` is set and a row's `date` is earlier (retention cap).
+        """
         start = 0
         while True:
             data = await self._cmd("get_history", start=start, length=length) or {}
-            page = data.get("data", []) if isinstance(data, dict) else []
-            if not page:
-                break
-            for raw in page:
+            page_raw = data.get("data", []) if isinstance(data, dict) else []
+            if not page_raw:
+                return
+            page: list[TautulliHistoryRow] = []
+            stop = False
+            for raw in page_raw:
                 row = TautulliHistoryRow.model_validate(raw)
-                if after_row_id is not None and row.id <= after_row_id:
-                    return rows
-                rows.append(row)
-            if len(page) < length:
-                break
+                if after_row_id is not None and row.id is not None and row.id <= after_row_id:
+                    stop = True
+                    break
+                if (
+                    not_before_unix is not None
+                    and row.date is not None
+                    and row.date < not_before_unix
+                ):
+                    stop = True
+                    break
+                page.append(row)
+            if page:
+                yield page
+            if stop or len(page_raw) < length:
+                return
             start += length
-        return rows
 
     async def metadata(self, rating_key: int) -> dict[str, Any]:
         """Fetch metadata for one rating_key — has guids array with tmdb/tvdb/imdb."""

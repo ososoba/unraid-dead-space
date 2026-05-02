@@ -159,6 +159,91 @@ async def _test_requester(instance) -> tuple[bool, str]:
         return False, str(exc)
 
 
+@router.post("/config/user-mapping", include_in_schema=False)
+async def config_save_user_mapping(
+    request: Request,
+    _: str = Depends(auth.require_login),
+    __: None = Depends(auth.require_csrf),
+    conn: sqlite3.Connection = Depends(get_db),
+) -> JSONResponse:
+    """Manually map a requester to a Tautulli user (PLAN.md §8 config page).
+
+    Form: requester_source, requester_id, tautulli_user_id (or '' to clear).
+    The new row is marked match_method='manual' / confidence='high' so the
+    next sync's auto-refresh leaves it alone.
+    """
+    form = await request.form()
+    source = (form.get("requester_source") or "").strip()
+    try:
+        requester_id = int(form.get("requester_id") or "")
+    except ValueError:
+        raise HTTPException(400, "requester_id must be an int") from None
+
+    raw_tautulli = (form.get("tautulli_user_id") or "").strip()
+    tautulli_user_id: int | None = None
+    tautulli_user_name: str | None = None
+    if raw_tautulli:
+        try:
+            tautulli_user_id = int(raw_tautulli)
+        except ValueError:
+            raise HTTPException(400, "tautulli_user_id must be an int") from None
+        # Look up the friendly name from watch_events for the audit log + UI.
+        row = conn.execute(
+            "SELECT user_name FROM watch_events WHERE user_id = ? LIMIT 1",
+            (tautulli_user_id,),
+        ).fetchone()
+        if row is not None:
+            tautulli_user_name = row["user_name"]
+
+    existing = conn.execute(
+        "SELECT requester_name FROM user_identity_map "
+        "WHERE requester_source = ? AND requester_id = ?",
+        (source, requester_id),
+    ).fetchone()
+    requester_name = existing["requester_name"] if existing else None
+
+    with conn:
+        conn.execute(
+            """
+            INSERT INTO user_identity_map
+              (requester_source, requester_id, requester_name,
+               tautulli_user_id, tautulli_user_name, plex_username,
+               match_method, confidence, updated_at)
+            VALUES (?, ?, ?, ?, ?, NULL, 'manual', 'high', datetime('now'))
+            ON CONFLICT(requester_source, requester_id) DO UPDATE SET
+              tautulli_user_id   = excluded.tautulli_user_id,
+              tautulli_user_name = excluded.tautulli_user_name,
+              match_method       = 'manual',
+              confidence         = 'high',
+              updated_at         = excluded.updated_at
+            """,
+            (source, requester_id, requester_name, tautulli_user_id, tautulli_user_name),
+        )
+        conn.execute(
+            "INSERT INTO audit_log (actor, action, target, details_json) "
+            "VALUES (?, 'user_mapping_saved', ?, ?)",
+            (
+                auth.current_user(request) or "?",
+                f"{source}:{requester_id}",
+                json.dumps(
+                    {
+                        "tautulli_user_id": tautulli_user_id,
+                        "tautulli_user_name": tautulli_user_name,
+                    }
+                ),
+            ),
+        )
+    return JSONResponse(
+        {
+            "ok": True,
+            "requester_source": source,
+            "requester_id": requester_id,
+            "tautulli_user_id": tautulli_user_id,
+            "tautulli_user_name": tautulli_user_name,
+        }
+    )
+
+
 @router.post("/config/purge-history", include_in_schema=False)
 async def config_purge_history(
     request: Request,

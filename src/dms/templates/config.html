@@ -83,14 +83,27 @@
 
   <h2>Requester ↔ Plex user mapping</h2>
   {% if user_mappings %}
+    <p class="hint">
+      Auto-detected mappings come from each request service's user record.
+      Manual overrides won't be touched by future syncs. Pick "(unmapped)" to
+      clear an override and let auto-detection re-run.
+    </p>
     <table>
       <thead><tr><th>Source</th><th>Requester</th><th>Tautulli user</th><th>Method</th><th>Confidence</th></tr></thead>
       <tbody>
         {% for m in user_mappings %}
-          <tr>
+          <tr data-source="{{ m.requester_source }}" data-rid="{{ m.requester_id }}">
             <td>{{ m.requester_source }}</td>
             <td>{{ m.requester_name or '—' }}</td>
-            <td>{{ m.tautulli_user_name or '<unmapped>' }}</td>
+            <td>
+              <select class="user-map" data-source="{{ m.requester_source }}" data-rid="{{ m.requester_id }}">
+                <option value="" {% if not m.tautulli_user_id %}selected{% endif %}>(unmapped)</option>
+                {% for uid, uname in tautulli_users %}
+                  <option value="{{ uid }}" {% if m.tautulli_user_id == uid %}selected{% endif %}>{{ uname or uid }}</option>
+                {% endfor %}
+              </select>
+              <span class="status user-map-status"></span>
+            </td>
             <td>{{ m.match_method }}</td>
             <td>{{ m.confidence }}</td>
           </tr>
@@ -142,6 +155,27 @@ document.querySelectorAll('button.action').forEach(btn => {
       btn.disabled = false;
       status.textContent = data.ok ? `deleted ${data.deleted_rows} rows` : 'failed';
     }
+  });
+});
+
+// Manual requester ↔ Tautulli user mapping: save on dropdown change.
+document.querySelectorAll('select.user-map').forEach(sel => {
+  sel.addEventListener('change', async () => {
+    const status = sel.parentElement.querySelector('.user-map-status');
+    sel.disabled = true; status.textContent = 'saving…';
+    const body = new URLSearchParams({
+      requester_source: sel.dataset.source,
+      requester_id: sel.dataset.rid,
+      tautulli_user_id: sel.value,
+    });
+    const res = await fetch('/config/user-mapping', {
+      method: 'POST',
+      headers: {'X-CSRF-Token': csrf, 'Content-Type': 'application/x-www-form-urlencoded'},
+      body: body.toString(),
+    });
+    sel.disabled = false;
+    const data = await res.json().catch(() => ({}));
+    status.textContent = res.ok ? 'saved · re-sync to recompute' : 'failed';
   });
 });
 </script>

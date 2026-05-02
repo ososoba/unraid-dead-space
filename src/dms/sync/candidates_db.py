@@ -167,7 +167,48 @@ def compute_candidates(
             params,
         )
 
-        # 7. orphan_arr_no_plex — arr_items with no plex_item match by external ID.
+        # 7a. orphan_arr_no_plex (movies) — file-level match.
+        # PLAN.md decision #19: each Arr movie file must have a Plex media
+        # file with the same external ID AND a similar size (within 5%).
+        # This catches the 4K-vs-1080p split: same tmdb_id, different sizes.
+        # Series stay external-ID for now (per-episode matching = v2).
+        conn.execute(
+            """
+            INSERT INTO candidates
+              (arr_item_id, plex_item_id, reason, scope, size_bytes, age_days,
+               last_played_at, confidence, computed_at_sync_run_id)
+            SELECT
+              ai.id, NULL, 'orphan_arr_no_plex', 'anyone',
+              af.size_bytes, NULL, NULL, 'high', :run_id
+            FROM arr_items ai
+            JOIN arr_files af
+              ON af.arr_item_id = ai.id
+              AND af.deleted_at IS NULL
+              AND af.kind = 'movie'
+            LEFT JOIN ignore_rules ir ON ir.arr_item_id = ai.id
+            WHERE ai.kind = 'movie'
+              AND ai.deleted_at IS NULL
+              AND ai.ignored_local = 0
+              AND ir.id IS NULL
+              AND NOT EXISTS (
+                SELECT 1
+                FROM plex_items pi
+                JOIN plex_media_files pmf
+                  ON pmf.plex_item_id = pi.id AND pmf.deleted_at IS NULL
+                WHERE pi.deleted_at IS NULL
+                  AND ((pi.tmdb_id IS NOT NULL AND pi.tmdb_id = ai.tmdb_id)
+                    OR (pi.imdb_id IS NOT NULL AND pi.imdb_id = ai.imdb_id))
+                  AND (
+                    pmf.size_bytes = 0
+                    OR af.size_bytes = 0
+                    OR ABS(pmf.size_bytes - af.size_bytes) < af.size_bytes * 0.05
+                  )
+              )
+            """,
+            params,
+        )
+
+        # 7b. orphan_arr_no_plex (series) — keep external-ID match for v1.
         conn.execute(
             """
             INSERT INTO candidates
@@ -179,21 +220,25 @@ def compute_candidates(
             FROM arr_items ai
             JOIN v_arr_item_size s ON s.arr_item_id = ai.id
             LEFT JOIN ignore_rules ir ON ir.arr_item_id = ai.id
-            WHERE ai.deleted_at IS NULL
+            WHERE ai.kind = 'series'
+              AND ai.deleted_at IS NULL
               AND ai.ignored_local = 0
               AND ir.id IS NULL
               AND NOT EXISTS (
                 SELECT 1 FROM plex_items pi
                 WHERE pi.deleted_at IS NULL
-                  AND ((ai.tmdb_id IS NOT NULL AND pi.tmdb_id = ai.tmdb_id)
-                    OR (ai.tvdb_id IS NOT NULL AND pi.tvdb_id = ai.tvdb_id)
+                  AND ((ai.tvdb_id IS NOT NULL AND pi.tvdb_id = ai.tvdb_id)
+                    OR (ai.tmdb_id IS NOT NULL AND pi.tmdb_id = ai.tmdb_id)
                     OR (ai.imdb_id IS NOT NULL AND pi.imdb_id = ai.imdb_id))
               )
             """,
             params,
         )
 
-        # 8. orphan_plex_no_arr — plex_items with no arr_item match.
+        # 8. orphan_plex_no_arr — Plex files that no Arr knows about.
+        # File-level: a plex_media_file is orphan if no arr_file matches by
+        # external ID + size tolerance. We surface ONE candidate per
+        # plex_media_file so size accounting is accurate.
         conn.execute(
             """
             INSERT INTO candidates
@@ -204,15 +249,23 @@ def compute_candidates(
               NULL, pi.id, pmf.id, 'orphan_plex_no_arr', 'anyone',
               COALESCE(pmf.size_bytes, 0), NULL, NULL, 'high', :run_id
             FROM plex_items pi
-            LEFT JOIN plex_media_files pmf
+            JOIN plex_media_files pmf
               ON pmf.plex_item_id = pi.id AND pmf.deleted_at IS NULL
             WHERE pi.deleted_at IS NULL
               AND NOT EXISTS (
-                SELECT 1 FROM arr_items ai
+                SELECT 1
+                FROM arr_items ai
+                JOIN arr_files af
+                  ON af.arr_item_id = ai.id AND af.deleted_at IS NULL
                 WHERE ai.deleted_at IS NULL
                   AND ((pi.tmdb_id IS NOT NULL AND ai.tmdb_id = pi.tmdb_id)
                     OR (pi.tvdb_id IS NOT NULL AND ai.tvdb_id = pi.tvdb_id)
                     OR (pi.imdb_id IS NOT NULL AND ai.imdb_id = pi.imdb_id))
+                  AND (
+                    af.size_bytes = 0
+                    OR pmf.size_bytes = 0
+                    OR ABS(af.size_bytes - pmf.size_bytes) < pmf.size_bytes * 0.05
+                  )
               )
             """,
             params,

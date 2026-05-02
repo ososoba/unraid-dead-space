@@ -14,6 +14,7 @@ from dms import scheduler
 from dms.app import create_app
 from dms.db import connect
 from dms.migrations import apply_pending
+from tests.conftest import login_with_csrf
 
 TEST_PASSWORD = "hunter2-correct-horse"
 TEST_USERNAME = "admin"
@@ -56,7 +57,7 @@ def client(auth_env: None, tmp_path: Path) -> Iterator[TestClient]:
     # Disable scheduler for tests so cron triggers don't fire mid-test.
     app = create_app(db_path=db, enable_scheduler=False)
     with TestClient(app) as c:
-        c.post("/login", data={"username": TEST_USERNAME, "password": TEST_PASSWORD})
+        login_with_csrf(c, TEST_USERNAME, TEST_PASSWORD)
         yield c
 
 

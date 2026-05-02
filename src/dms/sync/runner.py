@@ -101,6 +101,7 @@ async def run_sync(
                     step=st,
                     page_size=config.http.backfill_page_size,
                     timeout=config.http.timeout_seconds,
+                    retention_years=config.history_retention_years,
                 )
                 summary.tautulli_history_inserted = tres.rows_inserted
             locks.heartbeat(conn, handle)

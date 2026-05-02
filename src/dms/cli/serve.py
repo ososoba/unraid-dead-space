@@ -14,6 +14,8 @@ import os
 
 import uvicorn
 
+logger = logging.getLogger(__name__)
+
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="dms.cli.serve")
@@ -21,16 +23,39 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--db", default=None, help="SQLite path (overrides ./config/db.sqlite)")
     parser.add_argument("--reload", action="store_true", help="Auto-reload on source change")
-    parser.add_argument("--workers", type=int, default=1, help="Must stay 1 for APScheduler")
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Must stay 1 (APScheduler + in-process state). >1 is clamped with a warning.",
+    )
     parser.add_argument("--log-level", default="info")
     parser.add_argument(
-        "--no-access-log",
+        "--access-log",
+        dest="access_log",
         action="store_true",
-        help="Disable per-request access logs (we don't log IPs)",
+        help="Enable per-request access logs (default off — we don't want IPs in logs)",
+    )
+    parser.add_argument(
+        "--forwarded-allow-ips",
+        default=os.environ.get("FORWARDED_ALLOW_IPS", "127.0.0.1"),
+        help=(
+            "Comma-separated list of trusted reverse-proxy IPs whose "
+            "X-Forwarded-* headers will be honored. Defaults to loopback "
+            "(Cloudflared listens on 127.0.0.1). Set to '*' if you fully "
+            "trust the network in front of the app."
+        ),
     )
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=args.log_level.upper())
+
+    if args.workers != 1:
+        logger.warning(
+            "ignoring --workers=%d; pinned to 1 (APScheduler + in-process "
+            "background-task registry require single-worker)",
+            args.workers,
+        )
 
     # `factory=True` calls dms.app.create_app() with no args — propagate
     # --db via env so the factory can pick it up.
@@ -43,11 +68,11 @@ def main(argv: list[str] | None = None) -> int:
         host=args.host,
         port=args.port,
         reload=args.reload,
-        workers=args.workers,
+        workers=1,
         log_level=args.log_level,
-        access_log=not args.no_access_log,
+        access_log=args.access_log,
         proxy_headers=True,
-        forwarded_allow_ips="*",
+        forwarded_allow_ips=args.forwarded_allow_ips,
     )
     return 0
 

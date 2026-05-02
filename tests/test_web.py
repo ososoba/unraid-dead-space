@@ -14,6 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from dms.app import create_app
+from tests.conftest import login_with_csrf
 
 TEST_PASSWORD = "hunter2-correct-horse"
 TEST_USERNAME = "admin"
@@ -65,29 +66,38 @@ def test_login_form_renders(client: TestClient) -> None:
 
 
 def test_login_rejects_bad_password(client: TestClient) -> None:
-    r = client.post(
-        "/login",
-        data={"username": TEST_USERNAME, "password": "wrong"},
-        follow_redirects=False,
-    )
+    r = login_with_csrf(client, TEST_USERNAME, "wrong")
     assert r.status_code == 401
     assert b"Invalid" in r.content
 
 
 def test_login_redirects_on_success(client: TestClient) -> None:
-    r = client.post(
-        "/login",
-        data={"username": TEST_USERNAME, "password": TEST_PASSWORD},
-        follow_redirects=False,
-    )
+    r = login_with_csrf(client, TEST_USERNAME, TEST_PASSWORD)
     assert r.status_code == 302
     assert r.headers["location"] == "/"
     # cookie was set
     assert "dms_session" in r.cookies or any(c.name == "dms_session" for c in client.cookies.jar)
 
 
+def test_login_without_csrf_returns_403(client: TestClient) -> None:
+    r = client.post(
+        "/login",
+        data={"username": TEST_USERNAME, "password": TEST_PASSWORD},
+        follow_redirects=False,
+    )
+    assert r.status_code == 403
+
+
+def test_login_throttle_after_repeated_failures(client: TestClient) -> None:
+    for _ in range(5):
+        login_with_csrf(client, TEST_USERNAME, "wrong")
+    r = login_with_csrf(client, TEST_USERNAME, TEST_PASSWORD)
+    assert r.status_code == 429
+    assert b"Too many" in r.content
+
+
 def test_authenticated_root_renders_dashboard(client: TestClient) -> None:
-    client.post("/login", data={"username": TEST_USERNAME, "password": TEST_PASSWORD})
+    login_with_csrf(client, TEST_USERNAME, TEST_PASSWORD)
     r = client.get("/")
     assert r.status_code == 200
     # Empty-state homepage on a fresh DB.
@@ -100,7 +110,7 @@ def test_config_requires_login(client: TestClient) -> None:
 
 
 def test_config_renders_when_authenticated(client: TestClient) -> None:
-    client.post("/login", data={"username": TEST_USERNAME, "password": TEST_PASSWORD})
+    login_with_csrf(client, TEST_USERNAME, TEST_PASSWORD)
     r = client.get("/config")
     assert r.status_code == 200
     assert b"Configuration" in r.content
@@ -111,14 +121,14 @@ def test_config_renders_when_authenticated(client: TestClient) -> None:
 
 
 def test_logout_requires_csrf(client: TestClient) -> None:
-    client.post("/login", data={"username": TEST_USERNAME, "password": TEST_PASSWORD})
+    login_with_csrf(client, TEST_USERNAME, TEST_PASSWORD)
     # No CSRF token submitted.
     r = client.post("/logout")
     assert r.status_code == 403
 
 
 def test_logout_with_csrf_clears_session(client: TestClient) -> None:
-    client.post("/login", data={"username": TEST_USERNAME, "password": TEST_PASSWORD})
+    login_with_csrf(client, TEST_USERNAME, TEST_PASSWORD)
     # Mint CSRF token by visiting /config (which renders the token).
     page = client.get("/config")
     csrf = _extract_csrf(page.text)
@@ -128,13 +138,13 @@ def test_logout_with_csrf_clears_session(client: TestClient) -> None:
 
 
 def test_save_config_requires_csrf(client: TestClient) -> None:
-    client.post("/login", data={"username": TEST_USERNAME, "password": TEST_PASSWORD})
+    login_with_csrf(client, TEST_USERNAME, TEST_PASSWORD)
     r = client.post("/config/save", data={"NEVER_WATCHED_DAYS": "60"})
     assert r.status_code == 403
 
 
 def test_save_config_persists(client: TestClient) -> None:
-    client.post("/login", data={"username": TEST_USERNAME, "password": TEST_PASSWORD})
+    login_with_csrf(client, TEST_USERNAME, TEST_PASSWORD)
     page = client.get("/config")
     csrf = _extract_csrf(page.text)
     r = client.post(
@@ -158,7 +168,7 @@ def test_save_config_persists(client: TestClient) -> None:
 
 
 def test_save_config_rejects_bad_value(client: TestClient) -> None:
-    client.post("/login", data={"username": TEST_USERNAME, "password": TEST_PASSWORD})
+    login_with_csrf(client, TEST_USERNAME, TEST_PASSWORD)
     page = client.get("/config")
     csrf = _extract_csrf(page.text)
     r = client.post(
@@ -169,7 +179,7 @@ def test_save_config_rejects_bad_value(client: TestClient) -> None:
 
 
 def test_purge_history_requires_csrf(client: TestClient) -> None:
-    client.post("/login", data={"username": TEST_USERNAME, "password": TEST_PASSWORD})
+    login_with_csrf(client, TEST_USERNAME, TEST_PASSWORD)
     r = client.post("/config/purge-history")
     assert r.status_code == 403
 

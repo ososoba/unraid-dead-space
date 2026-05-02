@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from dms.app import create_app
 from dms.db import connect
 from dms.migrations import apply_pending
+from tests.conftest import login_with_csrf
 
 TEST_PASSWORD = "hunter2-correct-horse"
 TEST_USERNAME = "admin"
@@ -63,7 +64,7 @@ def client(auth_env: None, tmp_path: Path) -> Iterator[TestClient]:
     _seed(db)
     app = create_app(db_path=db)
     with TestClient(app) as c:
-        c.post("/login", data={"username": TEST_USERNAME, "password": TEST_PASSWORD})
+        login_with_csrf(c, TEST_USERNAME, TEST_PASSWORD)
         yield c
 
 
@@ -184,7 +185,7 @@ def test_home_empty_when_no_runs(auth_env: None, tmp_path: Path) -> None:
     c.close()
     app = create_app(db_path=db)
     with TestClient(app) as cli:
-        cli.post("/login", data={"username": TEST_USERNAME, "password": TEST_PASSWORD})
+        login_with_csrf(cli, TEST_USERNAME, TEST_PASSWORD)
         r = cli.get("/")
     assert r.status_code == 200
     assert b"No syncs yet" in r.content

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from typing import Any
 
 import httpx
@@ -17,6 +18,23 @@ logger = logging.getLogger(__name__)
 # Status codes worth retrying. 401/403/404 are NOT retried — they're config bugs.
 _RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
 
+# Tautulli puts the API key in a query string, so any URL or body we surface
+# in an exception risks leaking it (those exceptions land in the UI and in
+# `sync_run_steps.error_json`). Match both URL form (`apikey=value`) and JSON
+# form (`"apikey": "value"`) and replace the value with `<redacted>` before
+# building any exception or log line.
+_SECRET_PARAM_RX = re.compile(
+    r"((?:api[_-]?key|apikey|token|password|secret)\"?\s*[=:]\s*\"?)[^&\s\"',]+",
+    re.IGNORECASE,
+)
+
+
+def scrub_secrets(text: str) -> str:
+    """Mask `apikey=...` / `token=...` / `"apikey":"..."` etc. inside a URL or body."""
+    if not text:
+        return text
+    return _SECRET_PARAM_RX.sub(r"\1<redacted>", text)
+
 
 class UpstreamError(Exception):
     """Base class for upstream API failures."""
@@ -24,9 +42,11 @@ class UpstreamError(Exception):
 
 class UpstreamHTTPError(UpstreamError):
     def __init__(self, status: int, url: str, body_snippet: str = "") -> None:
-        super().__init__(f"HTTP {status} from {url}: {body_snippet[:200]}")
+        clean_url = scrub_secrets(url)
+        clean_body = scrub_secrets(body_snippet[:200])
+        super().__init__(f"HTTP {status} from {clean_url}: {clean_body}")
         self.status = status
-        self.url = url
+        self.url = clean_url
 
 
 class UpstreamTimeoutError(UpstreamError):
