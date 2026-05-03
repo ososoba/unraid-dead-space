@@ -106,7 +106,11 @@ class ArrSeries(_Loose):
 
 
 class TautulliHistoryRow(_Loose):
-    id: int = Field(alias="id")  # row_id; stable PK
+    # Tautulli's history row_id; the stable PK we cursor on. Some installs
+    # return empty strings for `id` on certain rows (observed live). Allow
+    # None at the parsing layer; the sync skips rows without an id since
+    # they can't be inserted (UNIQUE NOT NULL on watch_events.source_row_id).
+    id: OptInt = Field(default=None, alias="id")
     rating_key: OptInt = None
     parent_rating_key: OptInt = None
     grandparent_rating_key: OptInt = None

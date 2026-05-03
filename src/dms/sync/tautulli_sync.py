@@ -133,7 +133,14 @@ async def sync_tautulli_history(
 
 
 def _insert_history_row(conn: sqlite3.Connection, h: TautulliHistoryRow) -> bool:
-    """INSERT OR IGNORE; return True if a new row was inserted."""
+    """INSERT OR IGNORE; return True if a new row was inserted.
+
+    Rows without a Tautulli row_id are silently skipped — `source_row_id`
+    is NOT NULL UNIQUE in our schema and represents the resumable cursor.
+    Live Tautulli installs do occasionally ship empty `id` fields.
+    """
+    if h.id is None:
+        return False
     cur = conn.execute(
         """
         INSERT OR IGNORE INTO watch_events

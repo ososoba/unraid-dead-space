@@ -37,6 +37,17 @@ class TestTautulliEmptyStringCoercion:
         assert row.user_id is None
         assert row.stopped is None
 
+    def test_history_row_empty_id_is_none(self) -> None:
+        """Tautulli ships rows with empty `id` on some installs — must
+        not raise (caught from a real /sync/status step error)."""
+        row = TautulliHistoryRow.model_validate({"id": "", "rating_key": 12345})
+        assert row.id is None
+        assert row.rating_key == 12345
+
+    def test_history_row_missing_id_is_none(self) -> None:
+        row = TautulliHistoryRow.model_validate({"rating_key": 12345})
+        assert row.id is None
+
 
 class TestParseGuid:
     def test_modern_tmdb(self) -> None:
