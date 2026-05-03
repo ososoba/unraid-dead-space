@@ -88,11 +88,13 @@
   </p>
 
   {% if rows %}
+    <div class="table-scroll">
     <table class="candidates">
       <thead>
         <tr>
           <th>Title</th><th>Reason</th><th>Requester</th><th>Instance</th>
-          <th>Added</th><th>Last play</th><th>Watch %</th><th>Size</th><th>Conf</th><th></th>
+          <th>Added</th><th>Last play</th><th>Watch %</th>
+          <th class="size">Size</th><th class="conf">Conf</th><th class="action"></th>
         </tr>
       </thead>
       <tbody>
@@ -100,7 +102,7 @@
           <tr class="row {% if r.confidence == 'low' %}low-conf{% endif %}">
             <td>
               <details>
-                <summary><strong>{{ r.title }}</strong>{% if r.year %} ({{ r.year }}){% endif %}</summary>
+                <summary><strong>{{ r.title }}{% if r.year %} ({{ r.year }}){% endif %}</strong></summary>
                 <div class="why">
                   <div><strong>Reason:</strong> {{ reason_label(r.reason) }} ({{ r.scope }})</div>
                   {% if r.requester_name %}<div><strong>Requester:</strong> <a href="/candidates?requester={{ r.requester_name }}">{{ r.requester_name }}</a>{% if r.requester_source %} via {{ r.requester_source }}{% endif %}</div>{% endif %}
@@ -133,9 +135,9 @@
                 {{ r.coverage_anyone | percent }}
               {% else %}—{% endif %}
             </td>
-            <td>{{ r.size_bytes | humansize }}</td>
-            <td>{{ r.confidence }}</td>
-            <td>
+            <td class="size">{{ r.size_bytes | humansize }}</td>
+            <td class="conf">{{ r.confidence }}</td>
+            <td class="action">
               {% if r.arr_item_id %}
                 <button class="action ignore-btn" data-id="{{ r.arr_item_id }}">Ignore</button>
               {% endif %}
@@ -144,6 +146,7 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
 
     {% if pages > 1 %}
       <nav class="pager">

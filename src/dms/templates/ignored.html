@@ -10,9 +10,10 @@
   {% if not rows %}
     <p>Nothing ignored. Click <strong>Ignore</strong> on a candidate row to add it.</p>
   {% else %}
+    <div class="table-scroll">
     <table>
       <thead>
-        <tr><th>Title</th><th>Instance</th><th>Requester</th><th>Size</th><th></th></tr>
+        <tr><th>Title</th><th>Instance</th><th>Requester</th><th class="size">Size</th><th class="action"></th></tr>
       </thead>
       <tbody>
         {% for r in rows %}
@@ -26,6 +27,7 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
   {% endif %}
 </section>
 

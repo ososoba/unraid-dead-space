@@ -12,6 +12,7 @@
       {% if run.finished_at %} · finished {{ run.finished_at | humandate }}{% endif %}
     </p>
     {% if steps %}
+      <div class="table-scroll">
       <table class="steps">
         <thead><tr><th>Step</th><th>Status</th><th>Seen</th><th>Changed</th><th>Error</th></tr></thead>
         <tbody>
@@ -26,6 +27,7 @@
           {% endfor %}
         </tbody>
       </table>
+      </div>
     {% endif %}
   {% endif %}
 </div>

@@ -9,6 +9,7 @@
     <p>No requesters known.</p>
   {% else %}
     <p class="meta">From sync run #{{ run.id }} ({{ run.status }}). Click a name or count to drill in.</p>
+    <div class="table-scroll">
     <table>
       <thead>
         <tr>
@@ -44,6 +45,7 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
   {% endif %}
 </section>
 {% endblock %}

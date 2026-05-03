@@ -22,6 +22,7 @@
   <p class="hint">Watch live progress on <a href="/sync">/sync</a>.</p>
 
   <h2>Connections</h2>
+  <div class="table-scroll">
   <table class="instances">
     <thead><tr><th>Slug</th><th>Kind</th><th>Name</th><th>URL</th><th>Items</th><th>Last seen OK</th><th>Last error</th><th></th></tr></thead>
     <tbody>
@@ -53,6 +54,7 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
   <p class="hint">API keys are loaded from <code>.env</code> and never displayed here.</p>
 
   <h2>Thresholds</h2>
@@ -88,6 +90,7 @@
       Manual overrides won't be touched by future syncs. Pick "(unmapped)" to
       clear an override and let auto-detection re-run.
     </p>
+    <div class="table-scroll">
     <table>
       <thead><tr><th>Source</th><th>Requester</th><th>Tautulli user</th><th>Method</th><th>Confidence</th></tr></thead>
       <tbody>
@@ -110,6 +113,7 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
   {% else %}
     <p>None yet — run a sync first.</p>
   {% endif %}

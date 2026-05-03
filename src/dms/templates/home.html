@@ -43,6 +43,7 @@
 
   <h2>Never watched, by age</h2>
   <p class="hint">Click a row to see the items.</p>
+  <div class="table-scroll">
   <table>
     <thead><tr><th>Age (days since added)</th><th>Items</th><th>Total size</th></tr></thead>
     <tbody>
@@ -57,10 +58,12 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 
   <h2>Top requesters by reclaim size</h2>
   {% if top_requesters %}
     <p class="hint">Click a name to see what they requested that's now a candidate.</p>
+    <div class="table-scroll">
     <table>
       <thead><tr><th>Requester</th><th>Candidate items</th><th>Reclaimable</th></tr></thead>
       <tbody>
@@ -73,6 +76,7 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
     <p class="meta"><a href="/requesters">All requesters →</a></p>
   {% endif %}
 

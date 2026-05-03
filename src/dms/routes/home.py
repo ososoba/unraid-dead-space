@@ -44,6 +44,9 @@ async def home(
             "failed_steps": summary.failed_steps(conn, run.id),
             "top_requesters": summary.top_requesters_by_reclaim(conn, run.id, limit=5),
             "age_bucket_defs": summary.AGE_BUCKETS,
-            "reason_label": candidates_view.reason_label,
+            # Cards have plenty of horizontal room — use the verbose label
+            # so the dashboard reads cleanly. The compact label is for table
+            # rows where space is tight.
+            "reason_label": candidates_view.reason_long_label,
         },
     )

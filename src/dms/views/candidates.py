@@ -203,6 +203,22 @@ def reasons_for_tab(tab: str, *, scope: str = "anyone", state: StaleFilter = "al
 
 
 def reason_label(reason: str) -> str:
+    """Short label for in-row display. Kept under ~3 words so the Reason
+    column stays compact on narrow viewports."""
+    return {
+        "never_watched_anyone": "Never watched",
+        "never_watched_requester": "Requester never watched",
+        "stale_finished_anyone": "Finished, stale",
+        "stale_finished_requester": "Requester finished, stale",
+        "stale_partial_anyone": "Partial, stale",
+        "stale_partial_requester": "Requester partial, stale",
+        "orphan_arr_no_plex": "Missing in Plex",
+        "orphan_plex_no_arr": "Missing in *arr",
+    }.get(reason, reason)
+
+
+def reason_long_label(reason: str) -> str:
+    """Verbose label for the homepage cards / "Why is this listed?" drawer."""
     return {
         "never_watched_anyone": "Never watched (anyone)",
         "never_watched_requester": "Never watched by requester",

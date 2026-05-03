@@ -101,7 +101,8 @@ header.topbar {
   border-bottom: 1px solid var(--border);
 }
 header.topbar .brand { font-weight: 700; text-decoration: none; color: inherit; }
-header.topbar nav a, header.topbar nav button { margin-left: 1rem; color: var(--link); }
+header.topbar nav { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; align-items: center; }
+header.topbar nav a, header.topbar nav button { margin: 0; color: var(--link); }
 
 a { color: var(--link); }
 
@@ -110,6 +111,27 @@ button.link { background: none; border: 0; color: var(--link); cursor: pointer;
   font: inherit; padding: 0; text-decoration: underline; }
 
 main { max-width: 1100px; margin: 0 auto; padding: 1rem 1.25rem 4rem; }
+
+/* Tables that don't fit in the viewport scroll horizontally INSIDE this
+   wrapper, so the page itself never grows wider than the screen. Used
+   around every wide table (candidates, instance, requesters, config). */
+/* Scroll-hint shadows: a faint gradient on the right edge fades in when
+   the table is wider than the wrapper, so the user knows they can scroll
+   sideways. Uses background-attachment:local so the shadow tracks scroll. */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  background:
+    /* right shadow */
+    linear-gradient(to left, var(--bg), rgba(0,0,0,0)) right center / 1.25rem 100% no-repeat local,
+    /* left shadow */
+    linear-gradient(to right, var(--bg), rgba(0,0,0,0)) left center / 1.25rem 100% no-repeat local,
+    /* shadow indicator (only visible when overflowing) */
+    radial-gradient(farthest-side at right center, rgba(0,0,0,0.3), rgba(0,0,0,0)) right center / 1.25rem 100% no-repeat scroll,
+    radial-gradient(farthest-side at left center,  rgba(0,0,0,0.3), rgba(0,0,0,0)) left  center / 1.25rem 100% no-repeat scroll;
+}
+.table-scroll > table { margin-top: 0; }
 h1 { margin-top: 0.5rem; }
 h2 { margin-top: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 0.25rem; }
 
@@ -119,6 +141,12 @@ form input, form select {
   width: 100%; padding: 0.5rem; font: inherit;
   background: var(--card-bg); color: var(--fg); border: 1px solid var(--border);
   border-radius: 3px;
+}
+/* Inside the inline filter bar, inputs/selects shouldn't blow up to 100%
+   of the row — that wraps Sort/Per-page onto extra lines on narrow screens. */
+form.filters input, form.filters select { width: auto; }
+form.filters input[type="search"], form.filters input[type="text"] {
+  min-width: 10rem;
 }
 button {
   padding: 0.5rem 0.9rem; font: inherit; cursor: pointer;
@@ -173,7 +201,15 @@ form.filters { display: flex; gap: 0.6rem; flex-wrap: wrap; margin: 0.5rem 0; }
 form.filters label { width: auto; }
 form.filters select { width: auto; min-width: 9rem; }
 
-/* Candidates table */
+/* Candidates table — keep the action button + size + conf cells from
+   wrapping/clipping; let title and reason wrap when needed (the
+   .table-scroll wrapper handles the case where total width exceeds
+   the viewport). */
+table.candidates th, table.candidates td { vertical-align: top; }
+table.candidates td.size, table.candidates td.conf, table.candidates td.action,
+table.candidates th.size, table.candidates th.conf, table.candidates th.action {
+  white-space: nowrap;
+}
 table.candidates td details { max-width: 720px; }
 table.candidates .why {
   margin-top: 0.4rem; padding: 0.5rem 0.75rem; background: var(--why-bg);
@@ -210,3 +246,12 @@ ul.failed-steps li code { background: var(--failed-code-bg); }
 /* Clickable table rows on the homepage age-bucket table */
 tr.clickable td a { display: block; color: inherit; text-decoration: none; }
 tr.clickable:hover td { background: var(--card-hover); }
+
+/* Compact table cells + filter bar at narrow viewports. */
+@media (max-width: 800px) {
+  th, td { padding: 0.3rem 0.4rem; font-size: 0.9em; }
+  form.filters { gap: 0.4rem; }
+  form.filters label { font-size: 0.85em; }
+  h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.15rem; }
+}
