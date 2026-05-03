@@ -124,26 +124,52 @@ def list_candidates(
     conn: sqlite3.Connection,
     *,
     run_id: int,
-    reasons: Sequence[str],
+    reasons: Sequence[str] | None = None,
     instance_slug: str | None = None,
+    requester_name: str | None = None,
+    age_min_days: int | None = None,
+    age_max_days: int | None = None,
+    title_query: str | None = None,
     sort: SortKey = "size",
     page: int = 1,
     per_page: int = 50,
 ) -> tuple[list[CandidateRow], int]:
-    """Return (rows, total_count) for the given filter."""
-    placeholders = ",".join("?" for _ in reasons)
-    params: list[object] = [run_id, *reasons]
-    where_extra = ""
-    if instance_slug:
-        where_extra = " AND i.slug = ?"
-        params.append(instance_slug)
+    """Return (rows, total_count) for the given filter.
 
-    count_sql = (
-        "SELECT COUNT(*) "
-        + _from_join()
-        + f" WHERE c.computed_at_sync_run_id = ? AND c.reason IN ({placeholders})"
-        + where_extra
-    )
+    All filters are optional. Pass `reasons=None` (or omit) for "any reason".
+    `requester_name` matches request_attribution.requester_name exactly;
+    `age_min_days` / `age_max_days` filter on candidates.age_days inclusively;
+    `title_query` does a case-insensitive substring search on arr_items.title
+    (also falls back to plex_items.title for plex-only orphans).
+    """
+    where: list[str] = ["c.computed_at_sync_run_id = ?"]
+    params: list[object] = [run_id]
+    if reasons:
+        placeholders = ",".join("?" for _ in reasons)
+        where.append(f"c.reason IN ({placeholders})")
+        params.extend(reasons)
+    if instance_slug:
+        where.append("i.slug = ?")
+        params.append(instance_slug)
+    if requester_name:
+        where.append("ra.requester_name = ?")
+        params.append(requester_name)
+    if age_min_days is not None:
+        where.append("c.age_days IS NOT NULL AND c.age_days >= ?")
+        params.append(age_min_days)
+    if age_max_days is not None:
+        where.append("c.age_days IS NOT NULL AND c.age_days < ?")
+        params.append(age_max_days)
+    if title_query:
+        where.append(
+            "(LOWER(COALESCE(ai.title, '')) LIKE ?  OR LOWER(COALESCE(pi.title, '')) LIKE ?)"
+        )
+        like = f"%{title_query.lower()}%"
+        params.extend([like, like])
+
+    where_clause = " AND ".join(where)
+
+    count_sql = "SELECT COUNT(*) " + _from_join() + " WHERE " + where_clause
     total = int(conn.execute(count_sql, params).fetchone()[0])
 
     offset = max(0, (page - 1) * per_page)
@@ -151,8 +177,8 @@ def list_candidates(
         "SELECT "
         + _select_columns()
         + _from_join()
-        + f" WHERE c.computed_at_sync_run_id = ? AND c.reason IN ({placeholders})"
-        + where_extra
+        + " WHERE "
+        + where_clause
         + f" ORDER BY {_order_by(sort)} LIMIT ? OFFSET ?"
     )
     rows = conn.execute(list_sql, [*params, per_page, offset]).fetchall()

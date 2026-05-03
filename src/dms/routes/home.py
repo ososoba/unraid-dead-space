@@ -42,6 +42,8 @@ async def home(
             "age_buckets": summary.age_buckets_for_never_watched(conn, run.id),
             "instances": summary.instance_cards(conn),
             "failed_steps": summary.failed_steps(conn, run.id),
+            "top_requesters": summary.top_requesters_by_reclaim(conn, run.id, limit=5),
+            "age_bucket_defs": summary.AGE_BUCKETS,
             "reason_label": candidates_view.reason_label,
         },
     )

@@ -196,3 +196,17 @@ nav.pager a { text-decoration: none; }
 .sync-status .steps tr.status-succeeded { background: var(--status-succeeded-bg); }
 .sync-status .steps .err { white-space: normal; word-break: break-word; }
 ul.failed-steps li code { background: var(--failed-code-bg); }
+
+/* Active-filter chips on /candidates */
+.filters-active { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0; }
+.filters-active .chip {
+  display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px;
+  background: var(--card-bg); border: 1px solid var(--border);
+  color: var(--fg); text-decoration: none; font-size: 0.85em;
+}
+.filters-active .chip:hover { background: var(--card-hover); }
+.filters-active .chip.clear { color: var(--error); border-color: var(--error); }
+
+/* Clickable table rows on the homepage age-bucket table */
+tr.clickable td a { display: block; color: inherit; text-decoration: none; }
+tr.clickable:hover td { background: var(--card-hover); }

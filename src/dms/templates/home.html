@@ -24,34 +24,57 @@
     <a href="/sync">view live progress / sync now →</a>
   </p>
 
+  <p class="hint">Click any card or row below to see the items in that bucket.</p>
+
   <div class="cards">
-    <div class="card big">
+    <a class="card big link" href="/candidates?sort=size">
       <div class="num">{{ headline_bytes | humansize }}</div>
       <div class="lbl">total reclaim potential</div>
       <div class="sub">{{ headline_items }} items across all reasons</div>
-    </div>
+    </a>
     {% for r in reasons %}
-      <div class="card">
+      <a class="card link" href="/candidates?reason={{ r.reason }}&sort=size">
         <div class="num">{{ r.total_bytes | humansize }}</div>
         <div class="lbl">{{ reason_label(r.reason) }}</div>
         <div class="sub">{{ r.count }} item{% if r.count != 1 %}s{% endif %}</div>
-      </div>
+      </a>
     {% endfor %}
   </div>
 
   <h2>Never watched, by age</h2>
+  <p class="hint">Click a row to see the items.</p>
   <table>
     <thead><tr><th>Age (days since added)</th><th>Items</th><th>Total size</th></tr></thead>
     <tbody>
-      {% for b in age_buckets %}
-        <tr>
-          <td>{{ b.label }}</td>
-          <td>{{ b.count }}</td>
-          <td>{{ b.total_bytes | humansize }}</td>
+      {% for b, defn in zip(age_buckets, age_bucket_defs) %}
+        {# defn = (label, lo, hi-or-None) — used to build the age_min/age_max querystring #}
+        {% set href = "/candidates?reason=never_watched_anyone&age_min=" ~ defn[1] ~ ("&age_max=" ~ defn[2] if defn[2] else "") ~ "&sort=size" %}
+        <tr class="clickable">
+          <td><a href="{{ href }}">{{ b.label }}</a></td>
+          <td><a href="{{ href }}">{{ b.count }}</a></td>
+          <td><a href="{{ href }}">{{ b.total_bytes | humansize }}</a></td>
         </tr>
       {% endfor %}
     </tbody>
   </table>
+
+  <h2>Top requesters by reclaim size</h2>
+  {% if top_requesters %}
+    <p class="hint">Click a name to see what they requested that's now a candidate.</p>
+    <table>
+      <thead><tr><th>Requester</th><th>Candidate items</th><th>Reclaimable</th></tr></thead>
+      <tbody>
+        {% for tr in top_requesters %}
+          <tr>
+            <td><a href="/candidates?requester={{ tr.name }}&sort=size">{{ tr.name }}</a></td>
+            <td>{{ tr.candidate_count }}</td>
+            <td>{{ tr.candidate_bytes | humansize }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="meta"><a href="/requesters">All requesters →</a></p>
+  {% endif %}
 
   <h2>Per Arr instance</h2>
   <div class="cards">
@@ -72,6 +95,6 @@
     {% endfor %}
   </div>
 
-  <p><a href="/requesters">View by requester →</a> · <a href="/ignored">Ignored items →</a></p>
+  <p><a href="/candidates">All candidates →</a> · <a href="/requesters">By requester →</a> · <a href="/ignored">Ignored items →</a></p>
 </section>
 {% endblock %}

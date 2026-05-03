@@ -26,6 +26,7 @@ from dms import auth, formatters
 from dms.db import DEFAULT_DB_PATH, connect
 from dms.migrations import apply_pending
 from dms.routes import (
+    candidates_route,
     config_route,
     healthz,
     home,
@@ -43,6 +44,7 @@ logger = logging.getLogger(__name__)
 def _build_templates(package_dir: str) -> Jinja2Templates:
     templates = Jinja2Templates(directory=f"{package_dir}/templates")
     templates.env.globals["csrf_token"] = lambda request: auth.get_or_set_csrf(request)
+    templates.env.globals["zip"] = zip  # used by home.html for age-bucket links
     templates.env.filters["humansize"] = formatters.humansize
     templates.env.filters["humandate"] = formatters.humandate
     templates.env.filters["relative_days"] = formatters.relative_days
@@ -121,6 +123,7 @@ def create_app(
     app.include_router(login.router)
     app.include_router(config_route.router)
     app.include_router(home.router)  # `/`
+    app.include_router(candidates_route.router)  # `/candidates` (universal drill-down)
     app.include_router(instance.router)  # `/instance/{slug}`
     app.include_router(requesters.router)  # `/requesters`
     app.include_router(ignored.router)  # `/ignored` + `/items/.../ignore`

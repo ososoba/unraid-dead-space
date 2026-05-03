@@ -161,17 +161,40 @@ class RequesterTotal:
     name: str
     item_count: int
     total_bytes: int
+    # Per-bucket counts for the requesters page columns. All counts are taken
+    # over the latest run's candidates table.
     never_watched_count: int
+    never_watched_bytes: int
+    stale_count: int
+    stale_bytes: int
 
 
 def requester_totals(conn: sqlite3.Connection, run_id: int) -> list[RequesterTotal]:
+    """Per-requester rollup over the latest run's candidates.
+
+    `item_count` / `total_bytes` count every arr_item attributed to that
+    requester, candidate or not. The per-bucket columns count + sum
+    candidates whose reason matches that bucket — so users can see at a
+    glance "Alex requested 50 things; 30 are never watched, totaling 5 TB."
+    """
     rows = conn.execute(
         """
         SELECT
           COALESCE(ra.requester_name, '(no requester)') AS name,
           COUNT(DISTINCT ai.id) AS item_count,
           COALESCE(SUM(s.total_bytes), 0) AS total_bytes,
-          SUM(CASE WHEN c.reason = 'never_watched_anyone' THEN 1 ELSE 0 END) AS nw
+          SUM(CASE WHEN c.reason = 'never_watched_anyone' THEN 1 ELSE 0 END)
+            AS never_watched_count,
+          COALESCE(SUM(CASE WHEN c.reason = 'never_watched_anyone'
+                            THEN c.size_bytes ELSE 0 END), 0)
+            AS never_watched_bytes,
+          SUM(CASE WHEN c.reason IN ('stale_finished_anyone',
+                                     'stale_partial_anyone') THEN 1 ELSE 0 END)
+            AS stale_count,
+          COALESCE(SUM(CASE WHEN c.reason IN ('stale_finished_anyone',
+                                              'stale_partial_anyone')
+                            THEN c.size_bytes ELSE 0 END), 0)
+            AS stale_bytes
         FROM arr_items ai
         LEFT JOIN request_attribution ra ON ra.arr_item_id = ai.id
         LEFT JOIN candidates c ON c.arr_item_id = ai.id
@@ -193,7 +216,48 @@ def requester_totals(conn: sqlite3.Connection, run_id: int) -> list[RequesterTot
             name=r["name"],
             item_count=int(r["item_count"]),
             total_bytes=int(r["total_bytes"]),
-            never_watched_count=int(r["nw"] or 0),
+            never_watched_count=int(r["never_watched_count"] or 0),
+            never_watched_bytes=int(r["never_watched_bytes"] or 0),
+            stale_count=int(r["stale_count"] or 0),
+            stale_bytes=int(r["stale_bytes"] or 0),
+        )
+        for r in rows
+    ]
+
+
+@dataclass(frozen=True)
+class TopRequester:
+    name: str
+    candidate_bytes: int
+    candidate_count: int
+
+
+def top_requesters_by_reclaim(
+    conn: sqlite3.Connection, run_id: int, *, limit: int = 5
+) -> list[TopRequester]:
+    """For the homepage strip: who has the most dead-candidate bytes."""
+    rows = conn.execute(
+        """
+        SELECT
+          COALESCE(ra.requester_name, '(no requester)') AS name,
+          COALESCE(SUM(c.size_bytes), 0) AS bytes,
+          COUNT(*) AS n
+        FROM candidates c
+        JOIN arr_items ai ON ai.id = c.arr_item_id
+        LEFT JOIN request_attribution ra ON ra.arr_item_id = ai.id
+        WHERE c.computed_at_sync_run_id = ?
+        GROUP BY name
+        HAVING bytes > 0
+        ORDER BY bytes DESC
+        LIMIT ?
+        """,
+        (run_id, limit),
+    ).fetchall()
+    return [
+        TopRequester(
+            name=r["name"],
+            candidate_bytes=int(r["bytes"] or 0),
+            candidate_count=int(r["n"] or 0),
         )
         for r in rows
     ]

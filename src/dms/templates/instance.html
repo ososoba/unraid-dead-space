@@ -4,6 +4,7 @@
 {% set qs_base = "tab=" ~ tab ~ "&scope=" ~ scope ~ "&state=" ~ state ~ "&sort=" ~ sort ~ "&per_page=" ~ per_page %}
 <section>
   <h1>{{ instance.name }} <span class="hint">({{ instance.kind }})</span></h1>
+  <p class="meta"><a href="/candidates?instance={{ instance.slug }}">→ See this instance in the universal candidates view</a> (lets you cross-filter by requester / age / title)</p>
 
   <nav class="tabs">
     {% for t in ['never', 'stale', 'orphans'] %}

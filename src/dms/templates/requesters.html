@@ -8,23 +8,38 @@
   {% elif not totals %}
     <p>No requesters known.</p>
   {% else %}
-    <p class="meta">From sync run #{{ run.id }} ({{ run.status }}).</p>
+    <p class="meta">From sync run #{{ run.id }} ({{ run.status }}). Click a name or count to drill in.</p>
     <table>
       <thead>
         <tr>
           <th>Requester</th>
-          <th>Items</th>
+          <th>Total items</th>
           <th>Total size</th>
-          <th>Never watched (anyone)</th>
+          <th>Never watched</th>
+          <th>… size</th>
+          <th>Stale</th>
+          <th>… size</th>
         </tr>
       </thead>
       <tbody>
         {% for t in totals %}
+          {% set name_q = "/candidates?requester=" ~ t.name ~ "&sort=size" %}
           <tr>
-            <td>{{ t.name }}</td>
+            <td><a href="{{ name_q }}">{{ t.name }}</a></td>
             <td>{{ t.item_count }}</td>
             <td>{{ t.total_bytes | humansize }}</td>
-            <td>{{ t.never_watched_count }}</td>
+            <td>
+              {% if t.never_watched_count %}
+                <a href="/candidates?requester={{ t.name }}&reason=never_watched_anyone&sort=size">{{ t.never_watched_count }}</a>
+              {% else %}—{% endif %}
+            </td>
+            <td>{{ t.never_watched_bytes | humansize if t.never_watched_count else '—' }}</td>
+            <td>
+              {% if t.stale_count %}
+                <a href="/candidates?requester={{ t.name }}&reason=stale_finished_anyone,stale_partial_anyone&sort=size">{{ t.stale_count }}</a>
+              {% else %}—{% endif %}
+            </td>
+            <td>{{ t.stale_bytes | humansize if t.stale_count else '—' }}</td>
           </tr>
         {% endfor %}
       </tbody>

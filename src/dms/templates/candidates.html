@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %}Candidates — Dead Movies &amp; Shows{% endblock %}
+{% block content %}
+{% set qs = [] %}
+{% if filter_reasons %}{% set _ = qs.append("reason=" ~ filter_reasons|join(",")) %}{% endif %}
+{% if filter_instance %}{% set _ = qs.append("instance=" ~ filter_instance) %}{% endif %}
+{% if filter_requester %}{% set _ = qs.append("requester=" ~ filter_requester) %}{% endif %}
+{% if filter_age_min is not none %}{% set _ = qs.append("age_min=" ~ filter_age_min) %}{% endif %}
+{% if filter_age_max is not none %}{% set _ = qs.append("age_max=" ~ filter_age_max) %}{% endif %}
+{% if filter_title_query %}{% set _ = qs.append("q=" ~ filter_title_query) %}{% endif %}
+{% set _ = qs.append("sort=" ~ filter_sort) %}
+{% set _ = qs.append("per_page=" ~ per_page) %}
+{% set qs_base = qs|join("&") %}
+
+<section>
+  <h1>Candidates</h1>
+
+  {# Active-filter chips so the user can see what's narrowing the view #}
+  <div class="filters-active">
+    {% if filter_reasons %}
+      {% for r in filter_reasons %}
+        <a class="chip" href="/candidates?{% set drop = "reason=" ~ filter_reasons|join(",") %}{{ qs_base|replace(drop ~ "&", "")|replace("&" ~ drop, "")|replace(drop, "") }}">
+          {{ reason_label(r) }} ✕
+        </a>
+      {% endfor %}
+    {% endif %}
+    {% if filter_instance %}
+      <a class="chip" href="/candidates?{% set drop = "instance=" ~ filter_instance %}{{ qs_base|replace(drop ~ "&", "")|replace("&" ~ drop, "")|replace(drop, "") }}">
+        instance: {{ filter_instance }} ✕
+      </a>
+    {% endif %}
+    {% if filter_requester %}
+      <a class="chip" href="/candidates?{% set drop = "requester=" ~ filter_requester %}{{ qs_base|replace(drop ~ "&", "")|replace("&" ~ drop, "")|replace(drop, "") }}">
+        requester: {{ filter_requester }} ✕
+      </a>
+    {% endif %}
+    {% if filter_age_min is not none %}
+      <a class="chip" href="/candidates?{% set drop = "age_min=" ~ filter_age_min %}{{ qs_base|replace(drop ~ "&", "")|replace("&" ~ drop, "")|replace(drop, "") }}">
+        added ≥ {{ filter_age_min }}d ago ✕
+      </a>
+    {% endif %}
+    {% if filter_age_max is not none %}
+      <a class="chip" href="/candidates?{% set drop = "age_max=" ~ filter_age_max %}{{ qs_base|replace(drop ~ "&", "")|replace("&" ~ drop, "")|replace(drop, "") }}">
+        added &lt; {{ filter_age_max }}d ago ✕
+      </a>
+    {% endif %}
+    {% if filter_title_query %}
+      <a class="chip" href="/candidates?{% set drop = "q=" ~ filter_title_query %}{{ qs_base|replace(drop ~ "&", "")|replace("&" ~ drop, "")|replace(drop, "") }}">
+        title: “{{ filter_title_query }}” ✕
+      </a>
+    {% endif %}
+    {% if filter_reasons or filter_instance or filter_requester or filter_age_min is not none or filter_age_max is not none or filter_title_query %}
+      <a class="chip clear" href="/candidates">clear all</a>
+    {% endif %}
+  </div>
+
+  {# Inline filter form: title search + sort + page size #}
+  <form method="get" class="filters">
+    {% if filter_reasons %}<input type="hidden" name="reason" value="{{ filter_reasons|join(',') }}" />{% endif %}
+    {% if filter_instance %}<input type="hidden" name="instance" value="{{ filter_instance }}" />{% endif %}
+    {% if filter_requester %}<input type="hidden" name="requester" value="{{ filter_requester }}" />{% endif %}
+    {% if filter_age_min is not none %}<input type="hidden" name="age_min" value="{{ filter_age_min }}" />{% endif %}
+    {% if filter_age_max is not none %}<input type="hidden" name="age_max" value="{{ filter_age_max }}" />{% endif %}
+    <label>Search title
+      <input type="search" name="q" value="{{ filter_title_query }}" placeholder="e.g. Fianc" />
+    </label>
+    <label>Sort
+      <select name="sort" onchange="this.form.submit()">
+        <option value="size"        {% if filter_sort == 'size' %}selected{% endif %}>Largest first</option>
+        <option value="added"       {% if filter_sort == 'added' %}selected{% endif %}>Oldest add date</option>
+        <option value="last_played" {% if filter_sort == 'last_played' %}selected{% endif %}>Oldest last play</option>
+        <option value="coverage"    {% if filter_sort == 'coverage' %}selected{% endif %}>Lowest watch %</option>
+      </select>
+    </label>
+    <label>Per page
+      <select name="per_page" onchange="this.form.submit()">
+        {% for n in [25, 50, 100, 200] %}
+          <option value="{{ n }}" {% if per_page == n %}selected{% endif %}>{{ n }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">Apply</button>
+  </form>
+
+  <p class="meta">
+    {% if run %}{{ total }} candidate{% if total != 1 %}s{% endif %} from sync run #{{ run.id }} ({{ run.status }}).
+    {% else %}No syncs yet — run one from <a href="/sync">/sync</a>.{% endif %}
+  </p>
+
+  {% if rows %}
+    <table class="candidates">
+      <thead>
+        <tr>
+          <th>Title</th><th>Reason</th><th>Requester</th><th>Instance</th>
+          <th>Added</th><th>Last play</th><th>Watch %</th><th>Size</th><th>Conf</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr class="row {% if r.confidence == 'low' %}low-conf{% endif %}">
+            <td>
+              <details>
+                <summary><strong>{{ r.title }}</strong>{% if r.year %} ({{ r.year }}){% endif %}</summary>
+                <div class="why">
+                  <div><strong>Reason:</strong> {{ reason_label(r.reason) }} ({{ r.scope }})</div>
+                  {% if r.requester_name %}<div><strong>Requester:</strong> <a href="/candidates?requester={{ r.requester_name }}">{{ r.requester_name }}</a>{% if r.requester_source %} via {{ r.requester_source }}{% endif %}</div>{% endif %}
+                  <div><strong>Added:</strong> {{ r.age_days or '—' }} days ago</div>
+                  <div><strong>Last play (anyone):</strong> {{ r.last_played_at_anyone | humandate }}</div>
+                  <div><strong>Last play (requester):</strong> {{ r.last_played_at_requester | humandate }}</div>
+                  {% if r.coverage_anyone is not none %}
+                    <div><strong>Episode coverage (anyone):</strong> {{ r.coverage_anyone | percent }}</div>
+                    <div><strong>Episode coverage (requester):</strong> {{ r.coverage_requester | percent }}</div>
+                  {% endif %}
+                  <div><strong>Plex match:</strong>
+                    {% if r.plex_item_id %}yes{% if r.plex_file_path %} ({{ r.plex_file_path }}){% endif %}{% else %}no — orphan{% endif %}
+                  </div>
+                  <div><strong>Instance:</strong>
+                    {% if r.instance_slug %}<a href="/candidates?instance={{ r.instance_slug }}">{{ r.instance_name or r.instance_slug }}</a>{% else %}—{% endif %}
+                  </div>
+                  <div><strong>Confidence:</strong> {{ r.confidence }}</div>
+                </div>
+              </details>
+            </td>
+            <td><a href="/candidates?reason={{ r.reason }}">{{ reason_label(r.reason) }}</a></td>
+            <td>{% if r.requester_name %}<a href="/candidates?requester={{ r.requester_name }}">{{ r.requester_name }}</a>{% else %}—{% endif %}</td>
+            <td>{% if r.instance_slug %}<a href="/candidates?instance={{ r.instance_slug }}">{{ r.instance_slug }}</a>{% else %}—{% endif %}</td>
+            <td>{% if r.age_days is not none %}{{ r.age_days }}d{% else %}—{% endif %}</td>
+            <td>{{ r.last_played_at | humandate }}</td>
+            <td>
+              {% if r.scope == 'requester' and r.coverage_requester is not none %}
+                {{ r.coverage_requester | percent }}
+              {% elif r.coverage_anyone is not none %}
+                {{ r.coverage_anyone | percent }}
+              {% else %}—{% endif %}
+            </td>
+            <td>{{ r.size_bytes | humansize }}</td>
+            <td>{{ r.confidence }}</td>
+            <td>
+              {% if r.arr_item_id %}
+                <button class="action ignore-btn" data-id="{{ r.arr_item_id }}">Ignore</button>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if pages > 1 %}
+      <nav class="pager">
+        {% if page > 1 %}<a href="?{{ qs_base }}&page={{ page - 1 }}">← prev</a>{% endif %}
+        <span>page {{ page }} / {{ pages }}</span>
+        {% if page < pages %}<a href="?{{ qs_base }}&page={{ page + 1 }}">next →</a>{% endif %}
+      </nav>
+    {% endif %}
+  {% elif run %}
+    <p>No candidates match these filters.</p>
+  {% endif %}
+</section>
+
+<script>
+const csrf = "{{ csrf_token(request) }}";
+document.querySelectorAll('button.ignore-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const id = btn.dataset.id;
+    btn.disabled = true; btn.textContent = '…';
+    const res = await fetch('/items/' + id + '/ignore', {
+      method: 'POST', headers: {'X-CSRF-Token': csrf},
+    });
+    if (res.ok) {
+      btn.closest('tr').classList.add('ignored');
+      btn.textContent = 'Ignored';
+    } else {
+      btn.disabled = false; btn.textContent = 'Failed';
+    }
+  });
+});
+</script>
+{% endblock %}
