@@ -70,4 +70,8 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD curl --silent --fail --max-time 3 http://127.0.0.1:8765/healthz || exit 1
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/entrypoint.sh"]
-CMD ["python", "-m", "dms.cli.serve", "--host", "0.0.0.0", "--port", "8765", "--no-access-log"]
+# Note: --access-log is opt-in (default off) per the Codex review pass —
+# we don't want IPs in container logs. Don't add --no-access-log here:
+# that flag was removed when the default flipped, and passing it crashes
+# argparse in a restart loop.
+CMD ["python", "-m", "dms.cli.serve", "--host", "0.0.0.0", "--port", "8765"]
