@@ -92,7 +92,8 @@
     <table class="candidates">
       <thead>
         <tr>
-          <th>Title</th><th>Reason</th><th>Requester</th><th>Instance</th>
+          <th>Title</th><th>Reason</th><th class="scope">Scope</th>
+          <th>Requester</th><th>Instance</th>
           <th>Added</th><th>Last play</th><th>Watch %</th>
           <th class="size">Size</th><th class="conf">Conf</th><th class="action"></th>
         </tr>
@@ -124,6 +125,7 @@
               </details>
             </td>
             <td><a href="/candidates?reason={{ r.reason }}">{{ reason_label(r.reason) }}</a></td>
+            <td class="scope"><span class="scope-tag scope-{{ r.scope }}">{{ r.scope }}</span></td>
             <td>{% if r.requester_name %}<a href="/candidates?requester={{ r.requester_name }}">{{ r.requester_name }}</a>{% else %}—{% endif %}</td>
             <td>{% if r.instance_slug %}<a href="/candidates?instance={{ r.instance_slug }}">{{ r.instance_slug }}</a>{% else %}—{% endif %}</td>
             <td>{% if r.age_days is not none %}{{ r.age_days }}d{% else %}—{% endif %}</td>

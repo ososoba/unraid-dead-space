@@ -201,16 +201,32 @@ form.filters { display: flex; gap: 0.6rem; flex-wrap: wrap; margin: 0.5rem 0; }
 form.filters label { width: auto; }
 form.filters select { width: auto; min-width: 9rem; }
 
-/* Candidates table — keep the action button + size + conf cells from
-   wrapping/clipping; let title and reason wrap when needed (the
+/* Candidates table — keep the action button + size + conf + scope cells
+   from wrapping/clipping; let title and reason wrap when needed (the
    .table-scroll wrapper handles the case where total width exceeds
    the viewport). */
 table.candidates th, table.candidates td { vertical-align: top; }
 table.candidates td.size, table.candidates td.conf, table.candidates td.action,
-table.candidates th.size, table.candidates th.conf, table.candidates th.action {
+table.candidates td.scope,
+table.candidates th.size, table.candidates th.conf, table.candidates th.action,
+table.candidates th.scope {
   white-space: nowrap;
 }
 table.candidates td details { max-width: 720px; }
+
+/* Scope tag — small pill that makes scope-aware date/percent columns
+   self-explanatory. The "anyone" pill is neutral; "requester" gets a
+   warmer accent so requester-scope rows stand out. */
+.scope-tag {
+  display: inline-block; padding: 0.05rem 0.5rem; border-radius: 999px;
+  font-size: 0.78em; line-height: 1.4; text-transform: lowercase;
+  border: 1px solid var(--border); background: var(--card-bg);
+  color: var(--muted);
+}
+.scope-tag.scope-requester { border-color: #c47b00; color: #c47b00; }
+@media (prefers-color-scheme: dark) {
+  .scope-tag.scope-requester { border-color: #e2a64a; color: #e2a64a; }
+}
 table.candidates .why {
   margin-top: 0.4rem; padding: 0.5rem 0.75rem; background: var(--why-bg);
   border-radius: 4px; font-size: 0.9em;
