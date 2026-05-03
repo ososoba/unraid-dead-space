@@ -32,9 +32,7 @@ def test_insert_history_row_inserts_when_id_present(tmp_path: Path) -> None:
     c = connect(db)
     try:
         apply_pending(c)
-        h = TautulliHistoryRow.model_validate(
-            {"id": 42, "rating_key": 100, "media_type": "movie"}
-        )
+        h = TautulliHistoryRow.model_validate({"id": 42, "rating_key": 100, "media_type": "movie"})
         assert _insert_history_row(c, h) is True
         n = c.execute("SELECT COUNT(*) FROM watch_events").fetchone()[0]
         assert n == 1
