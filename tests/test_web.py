@@ -54,9 +54,37 @@ def test_healthz_no_auth(client: TestClient) -> None:
 
 
 def test_root_requires_auth_when_anonymous(client: TestClient) -> None:
-    r = client.get("/", follow_redirects=False)
-    # require_login raises 401; redirect-to-login is the UX layer's job.
+    """API clients (no Accept: text/html) get JSON 401."""
+    r = client.get(
+        "/",
+        follow_redirects=False,
+        headers={"Accept": "application/json"},
+    )
     assert r.status_code == 401
+    assert r.json()["detail"] == "login required"
+
+
+def test_root_redirects_browser_to_login(client: TestClient) -> None:
+    """Browser clients (Accept: text/html) get a 302 redirect to /login,
+    not a JSON {"detail": "login required"} dump."""
+    r = client.get(
+        "/",
+        follow_redirects=False,
+        headers={"Accept": "text/html,application/xhtml+xml"},
+    )
+    assert r.status_code == 302
+    assert r.headers["location"] == "/login"
+
+
+def test_protected_endpoint_redirects_browser_to_login(client: TestClient) -> None:
+    """Same redirect behavior for any other auth-required HTML page."""
+    r = client.get(
+        "/config",
+        follow_redirects=False,
+        headers={"Accept": "text/html"},
+    )
+    assert r.status_code == 302
+    assert r.headers["location"] == "/login"
 
 
 def test_login_form_renders(client: TestClient) -> None:

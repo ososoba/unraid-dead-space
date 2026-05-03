@@ -15,10 +15,12 @@ import logging
 from contextlib import asynccontextmanager
 from os import PathLike
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.responses import RedirectResponse, Response
 
 from dms import auth, formatters
 from dms.db import DEFAULT_DB_PATH, connect
@@ -103,6 +105,16 @@ def create_app(
     app.mount("/static", StaticFiles(directory=f"{package_dir}/static"), name="static")
     templates = _build_templates(package_dir)
     app.state.templates = templates
+
+    # 401 → redirect-to-login for browsers, JSON for API clients.
+    # require_login raises HTTPException(401, "login required"). The default
+    # FastAPI handler returns {"detail": "login required"} which is correct for
+    # API clients but unhelpful for users hitting an authed page in a browser.
+    @app.exception_handler(HTTPException)
+    async def _redirect_unauth_browsers(request: Request, exc: HTTPException) -> Response:
+        if exc.status_code == 401 and "text/html" in request.headers.get("accept", ""):
+            return RedirectResponse(url="/login", status_code=302)
+        return await http_exception_handler(request, exc)
 
     # Routes.
     app.include_router(healthz.router)
