@@ -84,3 +84,64 @@ def percent(value: float | None) -> str:
     if value is None:
         return "—"
     return f"{float(value):.0f}%"
+
+
+def signed_humansize(value: int | float | None) -> str:
+    """Same as `humansize` but with an explicit +/− sign for deltas. Zero
+    renders as a plain "0 B" (no sign — nothing changed)."""
+    if value is None:
+        return "—"
+    n = int(value)
+    if n == 0:
+        return "0 B"
+    sign = "+" if n > 0 else "−"
+    return f"{sign}{humansize(abs(n))}"
+
+
+def signed_pct(value: float | None) -> str:
+    """Percentage with explicit +/− sign for deltas; "—" when None."""
+    if value is None:
+        return "—"
+    n = float(value)
+    if n == 0:
+        return "0%"
+    sign = "+" if n > 0 else "−"
+    return f"{sign}{abs(n):.1f}%"
+
+
+def sparkline(
+    points: list,
+    *,
+    width: int = 280,
+    height: int = 50,
+    attr: str = "total_bytes",
+) -> str:
+    """Inline-SVG sparkline from a list of objects with a numeric attribute
+    (defaults to `total_bytes`, matching `views.snapshots.SnapshotPoint`).
+
+    Returns an empty string when there's nothing meaningful to draw (<2
+    points). The path uses `currentColor` so the line inherits text color
+    in both light + dark mode."""
+    if not points or len(points) < 2:
+        return ""
+    values = [float(getattr(p, attr)) for p in points]
+    vmin = min(values)
+    vmax = max(values)
+    vrange = max(1.0, vmax - vmin)
+    n = len(values)
+    pad = 2  # keeps the stroke from clipping at the edges
+    coords: list[str] = []
+    for i, v in enumerate(values):
+        x = pad + (i / (n - 1)) * (width - 2 * pad)
+        y = pad + (1 - (v - vmin) / vrange) * (height - 2 * pad)
+        coords.append(f"{x:.1f},{y:.1f}")
+    last_x, last_y = coords[-1].split(",")
+    return (
+        f'<svg viewBox="0 0 {width} {height}" width="{width}" height="{height}" '
+        f'class="sparkline" role="img" aria-label="trend">'
+        f'<polyline fill="none" stroke="currentColor" stroke-width="1.5" '
+        f'stroke-linejoin="round" stroke-linecap="round" '
+        f'points="{" ".join(coords)}" />'
+        f'<circle cx="{last_x}" cy="{last_y}" r="2.5" fill="currentColor" />'
+        f"</svg>"
+    )

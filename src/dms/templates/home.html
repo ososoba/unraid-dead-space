@@ -31,12 +31,33 @@
       <div class="num">{{ headline_bytes | humansize }}</div>
       <div class="lbl">total reclaim potential</div>
       <div class="sub">{{ headline_items }} items across all reasons</div>
+      {% if headline_stat and headline_stat.delta %}
+        {# Trend pill: bytes change + percent vs the previous successful sync. #}
+        {% set d = headline_stat.delta %}
+        <div class="trend {% if d.bytes_delta > 0 %}up{% elif d.bytes_delta < 0 %}down{% else %}flat{% endif %}">
+          <span class="trend-bytes">{{ d.bytes_delta | signed_humansize }}</span>
+          <span class="trend-pct">({{ d.pct | signed_pct }})</span>
+          <span class="trend-lbl">since last sync</span>
+        </div>
+      {% endif %}
+      {% if headline_series and headline_series|length > 1 %}
+        <div class="spark">{{ sparkline(headline_series) | safe }}</div>
+        <div class="sub">trend over last {{ headline_series|length }} syncs</div>
+      {% endif %}
     </a>
     {% for r in reasons %}
       <a class="card link" href="/candidates?reason={{ r.reason }}&sort=size">
         <div class="num">{{ r.total_bytes | humansize }}</div>
         <div class="lbl">{{ reason_label(r.reason) }}</div>
         <div class="sub">{{ r.count }} item{% if r.count != 1 %}s{% endif %}</div>
+        {% set st = reason_stats.get(r.reason) %}
+        {% if st and st.delta %}
+          {% set d = st.delta %}
+          <div class="trend {% if d.bytes_delta > 0 %}up{% elif d.bytes_delta < 0 %}down{% else %}flat{% endif %}">
+            <span class="trend-bytes">{{ d.bytes_delta | signed_humansize }}</span>
+            {% if d.pct is not none %}<span class="trend-pct">({{ d.pct | signed_pct }})</span>{% endif %}
+          </div>
+        {% endif %}
       </a>
     {% endfor %}
   </div>

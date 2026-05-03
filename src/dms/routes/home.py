@@ -9,7 +9,9 @@ from fastapi.responses import HTMLResponse, Response
 
 from dms import auth
 from dms.deps import get_db
+from dms.sync.snapshots import TOTAL_KEY
 from dms.views import candidates as candidates_view
+from dms.views import snapshots as snapshots_view
 from dms.views import summary
 
 router = APIRouter()
@@ -30,6 +32,13 @@ async def home(
             {"user": user},
         )
     items, total_bytes = summary.headline_reclaim_bytes(conn, run.id)
+    reasons = summary.reason_summary(conn, run.id)
+    # Snapshot lookups for the trend strip + per-card "since last sync"
+    # deltas. The headline uses the special TOTAL_KEY (DISTINCT-arr-item /
+    # MAX-size dedup); per-reason cards key on the reason itself.
+    headline_stat = snapshots_view.latest_with_delta(conn, TOTAL_KEY)
+    headline_series = snapshots_view.series(conn, TOTAL_KEY, limit=30)
+    reason_stats = snapshots_view.latest_with_delta_many(conn, [r.reason for r in reasons])
     return templates.TemplateResponse(
         request,
         "home.html",
@@ -38,7 +47,10 @@ async def home(
             "run": run,
             "headline_items": items,
             "headline_bytes": total_bytes,
-            "reasons": summary.reason_summary(conn, run.id),
+            "headline_stat": headline_stat,
+            "headline_series": headline_series,
+            "reasons": reasons,
+            "reason_stats": reason_stats,
             "age_buckets": summary.age_buckets_for_never_watched(conn, run.id),
             "instances": summary.instance_cards(conn),
             "failed_steps": summary.failed_steps(conn, run.id),

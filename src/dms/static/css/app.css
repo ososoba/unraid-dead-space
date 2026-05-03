@@ -181,6 +181,27 @@ code { background: var(--code-bg); padding: 0 4px; border-radius: 3px; }
 .card.link { display: block; color: inherit; text-decoration: none; }
 .card.link:hover { background: var(--card-hover); }
 
+/* Trend pill on dashboard cards: shows the bytes/percent change since the
+   previous snapshot. Up = grew (worse, more dead space accumulated),
+   down = shrunk (better, dead space cleaned up), flat = no change. The
+   colors match the existing --error / --ok semantics so the meaning is
+   consistent with the rest of the UI. */
+.trend {
+  display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem;
+  margin-top: 0.35rem; font-size: 0.85em;
+}
+.trend .trend-bytes { font-weight: 600; }
+.trend .trend-pct { color: inherit; opacity: 0.85; }
+.trend .trend-lbl { color: var(--hint); margin-left: 0.25rem; }
+.trend.up   { color: var(--error); }
+.trend.down { color: var(--ok); }
+.trend.flat { color: var(--muted); }
+
+/* Sparkline lives inside the headline card. currentColor on the polyline
+   means the line follows the surrounding text color in both themes. */
+.spark { margin-top: 0.5rem; line-height: 0; }
+.spark svg { max-width: 100%; height: auto; color: var(--link); }
+
 /* Banners */
 .banner { padding: 0.6rem 0.9rem; border-radius: 4px; margin: 0.75rem 0; }
 .banner.warn {

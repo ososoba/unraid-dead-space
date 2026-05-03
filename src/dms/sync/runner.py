@@ -24,6 +24,7 @@ from dms.sync import (
     plex_sync,
     requester_sync,
     runs,
+    snapshots,
     tautulli_sync,
     watch_state,
 )
@@ -157,6 +158,11 @@ async def run_sync(
                 stale_days=config.watch.stale_days,
             )
             st.items_changed = summary.candidate_rows
+
+        # Capture the dashboard rollup so the homepage can show trend +
+        # per-card "since last sync" deltas. Idempotent per run_id.
+        with runs.step(conn, run, "dashboard_snapshot") as st:
+            st.items_changed = snapshots.take_snapshot(conn, run_id=run.id)
 
     except Exception as exc:  # noqa: BLE001 — bookkeeping requires it
         logger.exception("sync run %d failed", run.id)

@@ -45,10 +45,13 @@ def _build_templates(package_dir: str) -> Jinja2Templates:
     templates = Jinja2Templates(directory=f"{package_dir}/templates")
     templates.env.globals["csrf_token"] = lambda request: auth.get_or_set_csrf(request)
     templates.env.globals["zip"] = zip  # used by home.html for age-bucket links
+    templates.env.globals["sparkline"] = formatters.sparkline
     templates.env.filters["humansize"] = formatters.humansize
     templates.env.filters["humandate"] = formatters.humandate
     templates.env.filters["relative_days"] = formatters.relative_days
     templates.env.filters["percent"] = formatters.percent
+    templates.env.filters["signed_humansize"] = formatters.signed_humansize
+    templates.env.filters["signed_pct"] = formatters.signed_pct
     return templates
 
 
